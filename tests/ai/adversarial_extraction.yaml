@@ -1,0 +1,72 @@
+# Set adversarial ekstraksi kewajiban (TRD §13.5). Label ditulis manual.
+# creates: apakah ketentuan membebankan kewajiban kepada entitas teregulasi (bank/LJK).
+# deadline: frasa tenggat yang benar (substring) atau null bila tidak ada / tidak dapat diurai.
+- id: considerans_date
+  trap: tanggal di konsiderans bukan tenggat
+  text: "Menimbang bahwa sejak tanggal 1 Januari 2020 telah terjadi peningkatan insiden siber, perlu menetapkan Peraturan Otoritas Jasa Keuangan tentang ketahanan siber."
+  creates: false
+- id: cross_reference_recipient
+  trap: pihak penerima dalam rujukan silang bukan penerima kewajiban
+  text: "Laporan sebagaimana dimaksud dalam Pasal 12 yang disampaikan kepada PPATK oleh pihak lain tidak mengurangi kewenangan Otoritas Jasa Keuangan."
+  creates: false
+- id: may_not_must
+  trap: "'dapat' (boleh) bukan 'wajib'"
+  text: "Bank dapat menunjuk pihak ketiga untuk melaksanakan pengujian penetrasi."
+  creates: false
+- id: definition_with_keyword
+  trap: "definisi istilah yang memuat kata 'Wajib'"
+  text: "Laporan Wajib adalah laporan yang disampaikan Bank kepada Otoritas Jasa Keuangan secara berkala."
+  creates: false
+- id: annex_deadline
+  trap: tenggat di lampiran yang tidak diurai platform
+  text: "Bank wajib menyampaikan laporan sesuai format dan jangka waktu sebagaimana tercantum dalam Lampiran II."
+  creates: true
+  deadline: null
+- id: negated_obligation
+  trap: "pengecualian 'tidak wajib'"
+  text: "Bank tidak wajib menyampaikan laporan apabila tidak terdapat transaksi pada periode berkenaan."
+  creates: false
+- id: prohibition
+  trap: larangan juga kewajiban (prohibited action)
+  text: "Bank dilarang mengungkapkan identitas pelapor kepada pihak mana pun."
+  creates: true
+- id: two_obligations
+  trap: satu pasal dua kewajiban (E8.1)
+  text: "Bank wajib menyusun rencana pemulihan. Bank wajib menguji rencana pemulihan paling sedikit 1 (satu) kali dalam 1 (satu) tahun."
+  creates: true
+  count: 2
+  deadline: "paling sedikit 1 (satu) kali dalam 1 (satu) tahun"
+- id: conditional_event
+  trap: kewajiban bersyarat (berbasis peristiwa)
+  text: "Dalam hal terjadi gangguan layanan lebih dari 2 (dua) jam, Bank wajib memberitahukan nasabah melalui kanal elektronik."
+  creates: true
+  deadline: null
+- id: sanction_clause
+  trap: ketentuan sanksi bukan kewajiban baru
+  text: "Bank yang melanggar ketentuan Pasal 5 dikenai sanksi administratif berupa teguran tertulis."
+  creates: false
+- id: entry_into_force
+  trap: tanggal berlaku bukan tenggat
+  text: "Peraturan ini mulai berlaku pada tanggal 1 Juli 2026."
+  creates: false
+- id: harus_synonym
+  trap: "'harus' bermakna wajib"
+  text: "Direksi harus memastikan ketersediaan sumber daya yang memadai untuk fungsi kepatuhan."
+  creates: true
+- id: regulator_obligation
+  trap: kewajiban milik regulator, bukan bank
+  text: "Otoritas Jasa Keuangan wajib menetapkan hasil penilaian paling lama 30 (tiga puluh) hari setelah dokumen diterima lengkap."
+  creates: false
+- id: relative_deadline
+  trap: tenggat relatif tanpa angka
+  text: "Bank wajib menyampaikan laporan realisasi paling lambat akhir bulan berikutnya."
+  creates: true
+  deadline: "paling lambat akhir bulan berikutnya"
+- id: diwajibkan_form
+  trap: "bentuk pasif 'diwajibkan'"
+  text: "Bank diwajibkan memiliki rencana kontinjensi likuiditas yang dikinikan setiap tahun."
+  creates: true
+- id: recommendation
+  trap: "anjuran 'sebaiknya' bukan kewajiban"
+  text: "Bank sebaiknya melakukan sosialisasi kebijakan anti-fraud secara berkala kepada seluruh pegawai."
+  creates: false

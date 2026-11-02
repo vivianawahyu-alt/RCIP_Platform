@@ -1,0 +1,11 @@
+# Set held-out: ditulis SEBELUM perbaikan rule-based-v2 dan tidak dipakai saat penyetelan.
+- {id: h_prohibition_2, text: "Penyelenggara dilarang membebankan biaya tambahan kepada konsumen tanpa persetujuan.", creates: true}
+- {id: h_harus_2, text: "Bank harus melakukan kaji ulang kebijakan kredit paling sedikit 1 (satu) kali dalam 1 (satu) tahun.", creates: true, deadline: "paling sedikit 1 (satu) kali dalam 1 (satu) tahun"}
+- {id: h_negation_2, text: "Bank tidak diwajibkan membentuk komite tambahan apabila total aset kurang dari Rp10 triliun.", creates: false}
+- {id: h_definition_2, text: "Rasio Wajib Pemenuhan adalah perbandingan antara aset likuid dan kewajiban jangka pendek.", creates: false}
+- {id: h_regulator_2, text: "Bank Indonesia wajib mengumumkan hasil penilaian dalam waktu 10 (sepuluh) hari kerja.", creates: false}
+- {id: h_plain_obl, text: "Bank wajib menyampaikan laporan pelaksanaan fungsi kepatuhan setiap semester.", creates: true}
+- {id: h_may_2, text: "Otoritas Jasa Keuangan dapat meminta Bank menyampaikan informasi tambahan.", creates: false}
+- {id: h_considerans_2, text: "Menimbang bahwa pada tanggal 31 Desember 2023 telah ditetapkan peta jalan pengembangan perbankan.", creates: false}
+- {id: h_diwajibkan_2, text: "Setiap Bank diwajibkan menunjuk satu anggota Direksi yang membawahkan fungsi kepatuhan.", creates: true}
+- {id: h_two_obl_2, text: "Bank wajib menyusun pedoman. Bank dilarang menunda penerapan pedoman tersebut.", creates: true, count: 2}

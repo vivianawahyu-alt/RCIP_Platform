@@ -1,0 +1,8 @@
+organisation_name: "PT Bank Sinar Nusantara"
+entity_type: "BANK_UMUM"
+licenses:
+  - "IZIN_BANK_UMUM_KONVENSIONAL"
+  - "PENYELENGGARA_JASA_PEMBAYARAN_KATEGORI_1"
+business_lines:
+  - "RETAIL_BANKING"
+  - "DIGITAL_BANKING"

@@ -1,0 +1,46 @@
+# Kunci jawaban deteksi perubahan (TRD §10.3, SM-04), disusun manual dari teks korpus sintetis.
+# material: penilaian manusia (bukan keluaran diff). Dipakai untuk mengukur recall diff dan presisi flag material.
+- pair_id: ti_v1_v2
+  document: "POJK 11/POJK.03/2022"
+  base: 1
+  new: 2
+  expected_changes:
+    - {pasal: "60", type: TEXT_MODIFIED, material: true, note: "tenggat laporan insiden 24 jam -> 12 jam"}
+    - {pasal: "61", type: PROVISION_ADDED, material: true, note: "kewajiban penyimpanan bukti baru"}
+  expected_unchanged: ["1", "5", "20"]
+- pair_id: apu_v1_v2
+  document: "POJK S-08/2023"
+  base: 1
+  new: 2
+  expected_changes:
+    - {pasal: "12", type: TEXT_MODIFIED, material: true, note: "LTKM 3 hari -> 1 hari kerja"}
+  expected_unchanged: ["1", "4", "15", "21", "30"]
+- pair_id: konsumen_v1_v2
+  document: "POJK S-22/2023"
+  base: 1
+  new: 2
+  expected_changes:
+    - {pasal: "33", type: TEXT_MODIFIED, material: true, note: "penanganan pengaduan 20 -> 10 hari kerja"}
+    - {pasal: "50", type: PROVISION_ADDED, material: true}
+  expected_unchanged: ["2", "19", "40", "44"]
+- pair_id: siber_v1_v2
+  document: "SEOJK S-29/2022"
+  base: 1
+  new: 2
+  expected_changes:
+    - {pasal: "7", type: TEXT_MODIFIED, material: true, note: "uji penetrasi 1 -> 2 kali setahun"}
+  expected_unchanged: ["3", "9", "14"]
+- pair_id: tatakelola_v1_v2
+  document: "POJK S-17/2023"
+  base: 1
+  new: 2
+  expected_changes:
+    - {pasal: "26", type: TEXT_MODIFIED, material: true, note: "laporan tata kelola 5 -> 4 bulan"}
+  expected_unchanged: ["5", "31", "38"]
+- pair_id: tatakelola_v2_v3
+  document: "POJK S-17/2023"
+  base: 2
+  new: 3
+  expected_changes:
+    - {pasal: "5", type: TEXT_MODIFIED, material: false, note: "redaksional 'dalam setiap' -> 'pada setiap'"}
+  expected_unchanged: ["26", "31", "38"]

@@ -1,0 +1,21 @@
+# DATA SINTETIS untuk demo (bukan teks resmi POJK). Ganti dengan PDF asli lewat endpoint upload.
+- canonical_number: "POJK 11/POJK.03/2022"
+  instrument_type: POJK
+  issuer: "Otoritas Jasa Keuangan"
+  title_id: "Penyelenggaraan Teknologi Informasi oleh Bank Umum"
+  versions:
+    - version_number: 1
+      effective_date: "2022-10-07"
+      provisions:
+        - {label: "Pasal 1", text: "Dalam Peraturan ini yang dimaksud dengan Bank adalah bank umum konvensional."}
+        - {label: "Pasal 5", text: "Bank wajib memiliki kebijakan keamanan siber yang disetujui direksi."}
+        - {label: "Pasal 20", text: "Bank wajib melakukan pengujian pemulihan bencana paling sedikit 1 (satu) kali dalam 1 (satu) tahun."}
+        - {label: "Pasal 60", text: "Bank wajib menyampaikan laporan insiden TI kepada Otoritas Jasa Keuangan paling lambat 24 (dua puluh empat) jam setelah insiden TI diketahui."}
+    - version_number: 2
+      effective_date: "2026-01-01"
+      provisions:
+        - {label: "Pasal 1", text: "Dalam Peraturan ini yang dimaksud dengan Bank adalah bank umum konvensional."}
+        - {label: "Pasal 5", text: "Bank wajib memiliki kebijakan keamanan siber yang disetujui direksi."}
+        - {label: "Pasal 20", text: "Bank wajib melakukan pengujian pemulihan bencana paling sedikit 1 (satu) kali dalam 1 (satu) tahun."}
+        - {label: "Pasal 60", text: "Bank wajib menyampaikan laporan insiden TI kepada Otoritas Jasa Keuangan paling lambat 12 (dua belas) jam setelah insiden TI diketahui."}
+        - {label: "Pasal 61", text: "Bank wajib menyimpan bukti pelaporan insiden TI paling singkat 5 (lima) tahun."}

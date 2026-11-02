@@ -1,0 +1,109 @@
+import { useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
+import { api, hasToken, setToken } from "./api";
+import { AiLabel } from "./components/AiLabel";
+import { CitationChip } from "./components/CitationChip";
+import { ChangeRow, DiffViewer } from "./components/DiffViewer";
+import { ProvisionViewer } from "./components/ProvisionViewer";
+
+type Doc = { id: string; canonical_number: string; title_id: string; versions: { id: string; version_number: number; state: string }[] };
+type Ob = { id: string; state: string; summary: string; deadline: string | null; derived_from_ai: boolean; confidence?: number | null; owner_id?: string | null; citation: { provision_version_id: string; canonical_number: string; number_label: string } };
+type Me = { username: string; role: string; user_id: string };
+type Risk = { id: string; obligation_id: string; title: string; severity: string; obligation_summary?: string };
+type Control = { id: string; risk_id?: string | null; title: string; owner_id?: string | null; obligation_id?: string | null; evidence_count: number; latest_assessment?: string | null };
+type Finding = { id: string; obligation_id: string; kind: string; description: string; state: string };
+const TABS = ["Dasbor", "Korpus", "Perubahan", "Kewajiban", "Risiko & Kontrol", "Temuan", "Laporan", "Copilot"] as const;
+
+type Run = (fn: () => Promise<unknown>) => Promise<void>;
+
+export default function App() {
+  const [me, setMe] = useState<Me | null>(JSON.parse(sessionStorage.getItem("rcip_me") || "null"));
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Dasbor");
+  const [err, setErr] = useState("");
+  const [cite, setCite] = useState<any>(null);
+  const run: Run = async (fn) => { setErr(""); try { await fn(); } catch (e) { setErr((e as Error).message); } };
+  if (!me || !hasToken()) return <Login onDone={setMe} />;
+  const openCite = (pvId: string) => run(async () => setCite((await api("/citations/resolve", { body: { provision_version_ids: [pvId] } })).resolved[0]));
+  const canManage = ["COMPLIANCE_OFFICER", "COMPLIANCE_MANAGER"].includes(me.role);
+  return <>
+    <header><div><h1>RCIP</h1><small>Regulatory & Compliance Intelligence Platform</small></div>
+      <nav>{TABS.map(t => <button key={t} className={t === tab ? "on" : ""} onClick={() => setTab(t)}>{t}</button>)}</nav>
+      <span className="userbox">{me.username} · {me.role}<button onClick={() => { setToken(""); sessionStorage.removeItem("rcip_me"); setMe(null); }}>Keluar</button></span>
+    </header>
+    <main><div className="pagehead"><div><h2>{tab}</h2><p className="muted">Kelola siklus regulasi, kewajiban, kontrol, temuan, dan ketertelusuran.</p></div></div>
+      {err && <div className="err">{err}</div>}
+      {tab === "Dasbor" && <Dasbor run={run} />}
+      {tab === "Korpus" && <Korpus run={run} />}
+      {tab === "Perubahan" && <Perubahan run={run} />}
+      {tab === "Kewajiban" && <Kewajiban me={me} run={run} openCite={openCite} />}
+      {tab === "Risiko & Kontrol" && <RisikoKontrol me={me} run={run} />}
+      {tab === "Temuan" && <Temuan me={me} run={run} />}
+      {tab === "Laporan" && <Laporan me={me} run={run} />}
+      {tab === "Copilot" && <Copilot run={run} openCite={openCite} />}
+    </main>
+    {cite && <div className="modal" onClick={() => setCite(null)}><div onClick={e => e.stopPropagation()}><h3>{cite.document.canonical_number} — {cite.number_label}</h3><p className="muted">{cite.document.title_id} · versi {cite.document_version.version_number} ({cite.document_version.state}) · berlaku {cite.document_version.effective_date}</p><p>{cite.text}</p><button className="act" onClick={() => setCite(null)}>Tutup</button></div></div>}
+  </>;
+}
+
+function Login({ onDone }: { onDone: (m: Me) => void }) {
+  const [u, setU] = useState("officer"), [p, setP] = useState("demo1234"), [err, setErr] = useState("");
+  const go = async () => { try { const r = await api("/auth/login", { body: { username: u, password: p } }); setToken(r.access_token); const m = { username: r.username, role: r.role, user_id: r.user_id }; sessionStorage.setItem("rcip_me", JSON.stringify(m)); onDone(m); } catch (e) { setErr((e as Error).message); } };
+  return <main><div className="login card"><div className="brand">RCIP</div><h2>Masuk ke platform</h2><p className="muted">Gunakan akun demo untuk mencoba workflow.</p>{err && <div className="err">{err}</div>}<label>Username<input value={u} onChange={e => setU(e.target.value)} /></label><label>Password<input type="password" value={p} onChange={e => setP(e.target.value)} /></label><button className="act wide" onClick={go}>Masuk</button><p className="muted small">analyst · officer · owner · legal · manager · auditor · executive · admin<br/>Password: demo1234</p></div></main>;
+}
+
+function Korpus({ run }: { run: Run }) {
+  const [docs, setDocs] = useState<Doc[]>([]), [sel, setSel] = useState(""), [msg, setMsg] = useState("");
+  const load = () => run(async () => { const d = await api<Doc[]>("/corpus/documents"); setDocs(d); if (!sel && d[0]?.versions.length) setSel(d[0].versions[d[0].versions.length - 1].id); });
+  useEffect(() => { load(); }, []);
+  const extract = (pv: string) => run(async () => { const r = await api("/compliance/obligations/extract", { body: { provision_version_id: pv } }); setMsg(`Draft dibuat (${r.model}). Buka tab Kewajiban untuk validasi.`); });
+  const upload = (e: ChangeEvent<HTMLInputElement>, docId: string) => run(async () => { const f = e.target.files?.[0]; if (!f) return; const form = new FormData(); form.append("file", f); form.append("effective_date", new Date().toISOString().slice(0, 10)); const r = await api(`/corpus/documents/${docId}/versions`, { form }); setMsg(`${r.provisions_created} pasal tersegmentasi (${r.state}).`); load(); });
+  return <><section className="hero"><div><span className="eyebrow">REGULATORY CORPUS</span><h3>Dokumen & versi regulasi</h3><p>Unggah versi baru, koreksi segmentasi, publikasi, lalu telusuri pasal yang menjadi sumber kewajiban.</p></div></section>{msg && <div className="success">{msg}</div>}{docs.map(d => <div className="card" key={d.id}><div className="row"><div><b>{d.canonical_number}</b><div>{d.title_id}</div></div><span className="pill">{d.versions.length} versi</span></div><div className="versionlist">{d.versions.map(v => <span key={v.id}><button className="act" onClick={() => setSel(v.id)}>v{v.version_number} · {v.state}</button>{v.state !== "PUBLISHED" && <button onClick={() => run(async () => { await api(`/corpus/versions/${v.id}/publish`, { method: "POST" }); load(); })}>Publikasikan</button>}</span>)}</div><label className="upload">Unggah versi baru (.pdf/.txt)<input type="file" onChange={e => upload(e, d.id)} /></label></div>)}{sel && <ProvisionViewer versionId={sel} onExtract={extract} />}</>;
+}
+
+function Perubahan({ run }: { run: Run }) {
+  const [docs, setDocs] = useState<Doc[]>([]), [rows, setRows] = useState<ChangeRow[] | null>(null);
+  useEffect(() => { run(async () => setDocs(await api<Doc[]>("/corpus/documents"))); }, []);
+  const cmp = (d: Doc) => run(async () => { const v = d.versions; if (v.length < 2) return; const r = await api("/corpus/changes", { body: { base_version_id: v[v.length - 2].id, new_version_id: v[v.length - 1].id } }); setRows(r.changes); });
+  return <><div className="sectionintro"><b>Deteksi perubahan material</b><span>Bandingkan dua versi terakhir dan telusuri perubahan pasal.</span></div>{docs.filter(d => d.versions.length > 1).map(d => <div className="card" key={d.id}><div className="row"><span><b>{d.canonical_number}</b> · {d.title_id}</span><button className="act" onClick={() => cmp(d)}>Bandingkan versi terakhir</button></div></div>)}{rows && <DiffViewer changes={rows} />}</>;
+}
+
+function Kewajiban({ me, run, openCite }: { me: Me; run: Run; openCite: (id: string) => void }) {
+  const [obs, setObs] = useState<Ob[]>([]), [users, setUsers] = useState<{id:string;username:string;role:string}[]>([]), [owner, setOwner] = useState(""), [trace, setTrace] = useState<any>(null);
+  const load = () => run(async () => { setObs(await api<Ob[]>("/compliance/obligations")); const u = await api<any[]>("/users"); setUsers(u); setOwner(o => o || u.find(x => x.username === "owner")?.id || ""); });
+  useEffect(() => { load(); }, []);
+  const act = (path: string, body?: unknown) => run(async () => { await api(path, { body: body ?? {} }); load(); });
+  return <><div className="toolbar"><span>{obs.length} kewajiban</span><span className="muted">AI draft harus divalidasi manusia sebelum menjadi aktif.</span></div>{obs.map(o => <div className="card" key={o.id}><div className="row"><div>{o.derived_from_ai && o.state === "AI_DRAFT" && <AiLabel />} <span className={`status ${o.state.toLowerCase()}`}>{o.state}</span></div><span className="confidence">{o.confidence != null ? `${Math.round(o.confidence * 100)}% confidence` : ""}</span></div><CitationChip label={`${o.citation.canonical_number} ${o.citation.number_label}`} onClick={() => openCite(o.citation.provision_version_id)} /><p className="summary">{o.summary || "Belum ada ringkasan."}</p>{o.deadline && <p className="muted">Tenggat: {o.deadline}</p>}{me.role === "COMPLIANCE_OFFICER" && (o.state === "AI_DRAFT" || o.state === "IN_VALIDATION") && <div className="actionbox"><select value={owner} onChange={e => setOwner(e.target.value)}>{users.filter(u => u.role !== "SYSTEM_ADMINISTRATOR").map(u => <option key={u.id} value={u.id}>{u.username} · {u.role}</option>)}</select><button className="act" onClick={() => act(`/compliance/obligations/${o.id}/validate`, { owner_id: owner })}>Validasi & tetapkan owner</button></div>}{me.role === "COMPLIANCE_MANAGER" && o.state === "PENDING_APPROVAL" && <div className="actionbox"><button className="act" onClick={() => act(`/compliance/obligations/${o.id}/decision`, { outcome: "APPROVED" })}>Setujui</button><button onClick={() => act(`/compliance/obligations/${o.id}/decision`, { outcome: "REJECTED", reason: "Perlu revisi" })}>Kembalikan</button></div>}<button className="linkbtn" onClick={() => run(async () => setTrace(await api(`/compliance/trace/obligations/${o.id}`)))}>Lihat ketertelusuran</button>{trace?.obligation?.id === o.id && <Trace data={trace} />}</div>)}{!obs.length && <Empty text="Belum ada kewajiban. Ekstrak dari tab Korpus setelah versi dipublikasikan."/>}</>;
+}
+
+function RisikoKontrol({ me, run }: { me: Me; run: Run }) {
+  const [obs, setObs] = useState<Ob[]>([]), [risks, setRisks] = useState<Risk[]>([]), [controls, setControls] = useState<Control[]>([]), [form, setForm] = useState({obligation_id:"",title:"",severity:"MEDIUM"}), [control, setControl] = useState({risk_id:"",title:"",owner_id:""});
+  const load = () => run(async () => { setObs(await api<Ob[]>("/compliance/obligations")); setRisks(await api<Risk[]>("/compliance/risks")); setControls(await api<Control[]>("/compliance/controls")); });
+  useEffect(() => { load(); }, []);
+  const createRisk = () => run(async () => { await api("/compliance/risks", { body: form }); setForm({obligation_id:"",title:"",severity:"MEDIUM"}); load(); });
+  const createControl = () => run(async () => { await api("/compliance/controls", { body: {...control, risk_id: control.risk_id || null, owner_id: control.owner_id || null} }); setControl({risk_id:"",title:"",owner_id:""}); load(); });
+  const map = (ob: string, ctl: string) => run(async () => { await api(`/compliance/obligations/${ob}/controls/${ctl}`, { body: {} }); load(); });
+  const officer = me.role === "COMPLIANCE_OFFICER";
+  return <><div className="grid2"><div className="card"><h3>Buat risiko</h3><label>Kewajiban<select value={form.obligation_id} onChange={e => setForm({...form, obligation_id:e.target.value})}><option value="">Pilih kewajiban</option>{obs.filter(o => o.state === "ACTIVE").map(o => <option key={o.id} value={o.id}>{o.citation.number_label} · {o.summary}</option>)}</select></label><label>Judul<input value={form.title} onChange={e => setForm({...form,title:e.target.value})}/></label><label>Severity<select value={form.severity} onChange={e => setForm({...form,severity:e.target.value})}><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label><button className="act" disabled={!officer || !form.obligation_id || !form.title} onClick={createRisk}>Tambah risiko</button>{!officer && <p className="muted">Hanya Compliance Officer yang dapat membuat risiko.</p>}</div><div className="card"><h3>Buat kontrol</h3><label>Risiko<select value={control.risk_id} onChange={e => setControl({...control,risk_id:e.target.value})}><option value="">Tanpa risiko</option>{risks.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}</select></label><label>Judul kontrol<input value={control.title} onChange={e => setControl({...control,title:e.target.value})}/></label><label>Owner ID (opsional)<input value={control.owner_id} onChange={e => setControl({...control,owner_id:e.target.value})}/></label><button className="act" disabled={!officer || !control.title} onClick={createControl}>Tambah kontrol</button></div></div><div className="grid2"><div><h3>Risiko ({risks.length})</h3>{risks.map(r => <div className="card" key={r.id}><div className="row"><b>{r.title}</b><span className={`severity ${r.severity.toLowerCase()}`}>{r.severity}</span></div><p className="muted">{r.obligation_summary || r.obligation_id}</p></div>)}</div><div><h3>Kontrol ({controls.length})</h3>{controls.map(c => <div className="card" key={c.id}><b>{c.title}</b><p className="muted">Bukti: {c.evidence_count} · Asesmen: {c.latest_assessment || "belum ada"}</p><div className="actionbox"><select defaultValue={c.obligation_id || ""} onChange={e => e.target.value && map(e.target.value,c.id)} disabled={!officer}><option value="">Pilih kewajiban untuk mapping</option>{obs.filter(o=>o.state === "ACTIVE").map(o=><option key={o.id} value={o.id}>{o.citation.number_label} · {o.summary}</option>)}</select></div></div>)}</div></div></>;
+}
+
+function Temuan({ me, run }: { me: Me; run: Run }) {
+  const [rows,setRows]=useState<Finding[]>([]), [due,setDue]=useState(new Date(Date.now()+7*86400000).toISOString().slice(0,10)), [desc,setDesc]=useState("");
+  const load=()=>run(async()=>setRows(await api<Finding[]>("/compliance/findings"))); useEffect(()=>{load()},[]);
+  const scan=()=>run(async()=>{await api("/compliance/gaps/scan",{body:{}});load()});
+  const remediate=(id:string)=>run(async()=>{await api(`/compliance/findings/${id}/remediation`,{body:{description:desc||"Tindak lanjut temuan",due_date:due}});setDesc("");load()});
+  const canScan=["COMPLIANCE_OFFICER","COMPLIANCE_MANAGER"].includes(me.role), canRemediate=["COMPLIANCE_OFFICER","BUSINESS_CONTROL_OWNER"].includes(me.role);
+  return <><div className="toolbar"><div><b>Temuan & kesenjangan</b><span className="muted">Gap dibuat otomatis dari kewajiban aktif yang belum memiliki kontrol efektif.</span></div>{canScan&&<button className="act" onClick={scan}>Scan gap sekarang</button>}</div>{rows.map(f=><div className="card" key={f.id}><div className="row"><span className={`status ${f.state.toLowerCase()}`}>{f.state}</span><b>{f.kind}</b></div><p>{f.description}</p>{canRemediate&&<div className="actionbox"><input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Deskripsi remediasi"/><input type="date" value={due} onChange={e=>setDue(e.target.value)}/><button className="act" onClick={()=>remediate(f.id)}>Buat remediasi</button></div>}</div>)}{!rows.length&&<Empty text="Belum ada temuan. Jalankan Scan gap setelah kewajiban dan kontrol tersedia."/>}</>;
+}
+
+function Laporan({ me, run }: { me: Me; run: Run }) {
+  const [reports,setReports]=useState<any[]>([]), [title,setTitle]=useState("Laporan Postur Kepatuhan");
+  const load=()=>run(async()=>setReports(await api<any[]>("/compliance/reports"))); useEffect(()=>{load()},[]);
+  const create=()=>run(async()=>{await api("/compliance/reports",{body:{title}});load()});
+  return <><div className="card"><div className="row"><div><h3>Laporan kepatuhan</h3><p className="muted">Laporan hanya dibuat setelah pemeriksaan ketertelusuran berhasil.</p></div><div className="actionbox"><input value={title} onChange={e=>setTitle(e.target.value)}/><button className="act" disabled={me.role!=="COMPLIANCE_MANAGER"} onClick={create}>Terbitkan laporan</button></div></div></div>{reports.map(r=><div className="card" key={r.id}><div className="row"><b>{r.title}</b><span className="pill">{r.state}</span></div><p className="muted">{new Date(r.created_at).toLocaleString("id-ID")} · traceability: {r.payload?.traceability_verified ? "verified" : "-"}</p><div className="reportmetrics"><Metric label="Kewajiban aktif" value={r.payload?.metrics?.active_obligations}/><Metric label="Skor kepatuhan" value={`${r.payload?.metrics?.compliance_score_percent ?? 0}%`}/><Metric label="Gap" value={r.payload?.metrics?.gaps}/><Metric label="Temuan" value={r.payload?.metrics?.open_findings}/></div></div>)}</>;
+}
+
+function Dasbor({ run }: { run: Run }) { const [m,setM]=useState<any>(null); useEffect(()=>{run(async()=>setM(await api("/compliance/dashboard")))},[]); if(!m)return <div className="card">Memuat dasbor…</div>; return <><section className="hero"><div><span className="eyebrow">COMPLIANCE POSTURE</span><h3>Ringkasan kepatuhan organisasi</h3><p>Angka dasbor mengecualikan kewajiban yang masih berstatus AI_DRAFT.</p></div></section><div className="metrics"><Metric label="Kewajiban aktif" value={m.active_obligations}/><Metric label="Skor kepatuhan" value={`${m.compliance_score_percent}%`}/><Metric label="Kesenjangan" value={m.gaps}/><Metric label="Temuan terbuka" value={m.open_findings}/><Metric label="AI draft" value={m.excluded_ai_draft}/></div><div className="card"><h3>Makna status</h3><div className="legend"><span><i className="dot active"/> ACTIVE dihitung</span><span><i className="dot draft"/> AI_DRAFT belum dihitung</span><span><i className="dot review"/> REVIEW_REQUIRED perlu ditinjau</span></div></div></> }
+function Metric({label,value}:{label:string;value:any}){return <div className="metric card"><span>{label}</span><b>{value ?? 0}</b></div>}
+function Trace({data}:{data:any}){return <div className="trace"><b>Ketertelusuran</b><p>{data.citation?.document?.canonical_number} · {data.citation?.number_label}</p><p className="muted">Approval: {data.approvals?.length || 0} · Kontrol: {data.controls?.length || 0}</p></div>}
+function Copilot({run,openCite}:{run:Run;openCite:(id:string)=>void}){const[q,setQ]=useState(""),[a,setA]=useState<any>(null);return <><div className="card"><h3>Regulatory Copilot</h3><p className="muted">Ajukan pertanyaan berbasis korpus. Jawaban dikembalikan bersama citation.</p><div className="copilotbox"><textarea value={q} onChange={e=>setQ(e.target.value)} placeholder="Contoh: apa kewajiban terkait pelaporan insiden TI?"/><button className="act" onClick={()=>run(async()=>setA(await api("/copilot/query",{body:{question:q}})))}>Tanya</button></div></div>{a&&<div className="card"><AiLabel/><pre className="answer">{a.answer}</pre>{a.citations?.map((c:any)=><CitationChip key={c.provision_version_id} label={c.citation} onClick={()=>openCite(c.provision_version_id)}/>)}</div>}</>}
+function Empty({text}:{text:string}){return <div className="empty">{text}</div>}

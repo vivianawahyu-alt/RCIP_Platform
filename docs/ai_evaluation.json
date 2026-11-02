@@ -1,0 +1,733 @@
+{
+  "generated_at": "2026-10-27T11:16:45.168534+00:00",
+  "extraction": {
+    "model_id": "rule-based-v2",
+    "standard": {
+      "tp": 69,
+      "fp": 1,
+      "fn": 0,
+      "tn": 11,
+      "schema_invalid": 0,
+      "grounding_failed": 0,
+      "cases": 81,
+      "errors": [
+        {
+          "document": "PBI S-07/2024",
+          "pasal": "1",
+          "kind": "DEF",
+          "error": "FP"
+        }
+      ],
+      "precision": 0.986,
+      "recall": 1.0,
+      "f1": 0.993
+    },
+    "adversarial": {
+      "cases": [
+        {
+          "id": "considerans_date",
+          "trap": "tanggal di konsiderans bukan tenggat",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "cross_reference_recipient",
+          "trap": "pihak penerima dalam rujukan silang bukan penerima kewajiban",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "may_not_must",
+          "trap": "'dapat' (boleh) bukan 'wajib'",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "definition_with_keyword",
+          "trap": "definisi istilah yang memuat kata 'Wajib'",
+          "expected": false,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "annex_deadline",
+          "trap": "tenggat di lampiran yang tidak diurai platform",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "negated_obligation",
+          "trap": "pengecualian 'tidak wajib'",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "prohibition",
+          "trap": "larangan juga kewajiban (prohibited action)",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "two_obligations",
+          "trap": "satu pasal dua kewajiban (E8.1)",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 2,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "conditional_event",
+          "trap": "kewajiban bersyarat (berbasis peristiwa)",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "sanction_clause",
+          "trap": "ketentuan sanksi bukan kewajiban baru",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "entry_into_force",
+          "trap": "tanggal berlaku bukan tenggat",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "harus_synonym",
+          "trap": "'harus' bermakna wajib",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "regulator_obligation",
+          "trap": "kewajiban milik regulator, bukan bank",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "relative_deadline",
+          "trap": "tenggat relatif tanpa angka",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "diwajibkan_form",
+          "trap": "bentuk pasif 'diwajibkan'",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "recommendation",
+          "trap": "anjuran 'sebaiknya' bukan kewajiban",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        }
+      ],
+      "correct": 15,
+      "deadline_checked": 4,
+      "deadline_correct": 4,
+      "accuracy": 0.938
+    },
+    "heldout": {
+      "cases": [
+        {
+          "id": "h_prohibition_2",
+          "trap": "",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_harus_2",
+          "trap": "",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "h_negation_2",
+          "trap": "",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_definition_2",
+          "trap": "",
+          "expected": false,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_regulator_2",
+          "trap": "",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_plain_obl",
+          "trap": "",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_may_2",
+          "trap": "",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_considerans_2",
+          "trap": "",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_diwajibkan_2",
+          "trap": "",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_two_obl_2",
+          "trap": "",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 2,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        }
+      ],
+      "correct": 9,
+      "deadline_checked": 1,
+      "deadline_correct": 1,
+      "accuracy": 0.9
+    }
+  },
+  "extraction_baseline_v1": {
+    "model_id": "rule-based-v1",
+    "standard": {
+      "tp": 66,
+      "fp": 1,
+      "fn": 3,
+      "tn": 11,
+      "schema_invalid": 0,
+      "grounding_failed": 0,
+      "cases": 81,
+      "errors": [
+        {
+          "document": "POJK S-08/2023",
+          "pasal": "21",
+          "kind": "PROHIB",
+          "error": "FN"
+        },
+        {
+          "document": "POJK S-17/2023",
+          "pasal": "38",
+          "kind": "PROHIB",
+          "error": "FN"
+        },
+        {
+          "document": "PBI S-07/2024",
+          "pasal": "1",
+          "kind": "DEF",
+          "error": "FP"
+        },
+        {
+          "document": "UU S-04/2023",
+          "pasal": "245",
+          "kind": "PROHIB",
+          "error": "FN"
+        }
+      ],
+      "precision": 0.985,
+      "recall": 0.957,
+      "f1": 0.971
+    },
+    "adversarial": {
+      "cases": [
+        {
+          "id": "considerans_date",
+          "trap": "tanggal di konsiderans bukan tenggat",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "cross_reference_recipient",
+          "trap": "pihak penerima dalam rujukan silang bukan penerima kewajiban",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "may_not_must",
+          "trap": "'dapat' (boleh) bukan 'wajib'",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "definition_with_keyword",
+          "trap": "definisi istilah yang memuat kata 'Wajib'",
+          "expected": false,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "annex_deadline",
+          "trap": "tenggat di lampiran yang tidak diurai platform",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "negated_obligation",
+          "trap": "pengecualian 'tidak wajib'",
+          "expected": false,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "prohibition",
+          "trap": "larangan juga kewajiban (prohibited action)",
+          "expected": true,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "two_obligations",
+          "trap": "satu pasal dua kewajiban (E8.1)",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 2,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "conditional_event",
+          "trap": "kewajiban bersyarat (berbasis peristiwa)",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "sanction_clause",
+          "trap": "ketentuan sanksi bukan kewajiban baru",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "entry_into_force",
+          "trap": "tanggal berlaku bukan tenggat",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "harus_synonym",
+          "trap": "'harus' bermakna wajib",
+          "expected": true,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "regulator_obligation",
+          "trap": "kewajiban milik regulator, bukan bank",
+          "expected": false,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "relative_deadline",
+          "trap": "tenggat relatif tanpa angka",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": true,
+          "grounded": true
+        },
+        {
+          "id": "diwajibkan_form",
+          "trap": "bentuk pasif 'diwajibkan'",
+          "expected": true,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "recommendation",
+          "trap": "anjuran 'sebaiknya' bukan kewajiban",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        }
+      ],
+      "correct": 10,
+      "deadline_checked": 4,
+      "deadline_correct": 4,
+      "accuracy": 0.625
+    },
+    "heldout": {
+      "cases": [
+        {
+          "id": "h_prohibition_2",
+          "trap": "",
+          "expected": true,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_harus_2",
+          "trap": "",
+          "expected": true,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": false,
+          "deadline_ok": false,
+          "grounded": true
+        },
+        {
+          "id": "h_negation_2",
+          "trap": "",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_definition_2",
+          "trap": "",
+          "expected": false,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_regulator_2",
+          "trap": "",
+          "expected": false,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_plain_obl",
+          "trap": "",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_may_2",
+          "trap": "",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_considerans_2",
+          "trap": "",
+          "expected": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_diwajibkan_2",
+          "trap": "",
+          "expected": true,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        },
+        {
+          "id": "h_two_obl_2",
+          "trap": "",
+          "expected": true,
+          "predicted": true,
+          "n_obligations": 1,
+          "correct": false,
+          "deadline_ok": null,
+          "grounded": true
+        }
+      ],
+      "correct": 4,
+      "deadline_checked": 1,
+      "deadline_correct": 0,
+      "accuracy": 0.4
+    }
+  },
+  "grounding_guardrail": {
+    "injected": 24,
+    "caught": 24,
+    "catch_rate": 1.0
+  },
+  "changes": {
+    "pairs": 6,
+    "expected_changes": 8,
+    "detected": 8,
+    "spurious": 0,
+    "recall": 1.0,
+    "materiality_flag": {
+      "precision": 0.875,
+      "recall": 1.0,
+      "f1": 0.933,
+      "tp": 7,
+      "fp": 1,
+      "fn": 0
+    },
+    "rows": [
+      {
+        "pair": "ti_v1_v2",
+        "expected": [
+          "60",
+          "61"
+        ],
+        "missed": [],
+        "spurious": []
+      },
+      {
+        "pair": "apu_v1_v2",
+        "expected": [
+          "12"
+        ],
+        "missed": [],
+        "spurious": []
+      },
+      {
+        "pair": "konsumen_v1_v2",
+        "expected": [
+          "33",
+          "50"
+        ],
+        "missed": [],
+        "spurious": []
+      },
+      {
+        "pair": "siber_v1_v2",
+        "expected": [
+          "7"
+        ],
+        "missed": [],
+        "spurious": []
+      },
+      {
+        "pair": "tatakelola_v1_v2",
+        "expected": [
+          "26"
+        ],
+        "missed": [],
+        "spurious": []
+      },
+      {
+        "pair": "tatakelola_v2_v3",
+        "expected": [
+          "5"
+        ],
+        "missed": [],
+        "spurious": []
+      }
+    ]
+  },
+  "copilot": {
+    "grounded_questions": 30,
+    "hit_at_3": 0.967,
+    "answered": 29,
+    "citation_rate": 1.0,
+    "out_of_corpus": 10,
+    "refusal_rate": 1.0,
+    "misses": [
+      {
+        "q": "Berapa hari tindak lanjut pengaduan konsumen?",
+        "expected": [
+          "POJK S-22/2023|Pasal 33",
+          "PBI S-03/2023|Pasal 14"
+        ],
+        "got": []
+      }
+    ],
+    "leaks": []
+  },
+  "targets": {
+    "change_recall": [
+      1.0,
+      0.95
+    ],
+    "grounding_catch_rate": [
+      1.0,
+      1.0
+    ],
+    "copilot_citation_rate": [
+      1.0,
+      1.0
+    ],
+    "copilot_refusal_rate": [
+      1.0,
+      1.0
+    ],
+    "copilot_hit_at_3": [
+      0.967,
+      0.8
+    ]
+  },
+  "all_targets_met": true
+}

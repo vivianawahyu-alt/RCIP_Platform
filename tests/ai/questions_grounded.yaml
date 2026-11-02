@@ -1,0 +1,31 @@
+# 30 pertanyaan bersumber korpus sintetis (SM-09). expected: sitasi yang benar (salah satu cukup), format "NOMOR|Pasal N".
+- {q: "Berapa lama batas pelaporan insiden TI ke OJK?", expected: ["POJK 11/POJK.03/2022|Pasal 60"]}
+- {q: "Berapa lama bukti pelaporan insiden TI harus disimpan?", expected: ["POJK 11/POJK.03/2022|Pasal 61"]}
+- {q: "Seberapa sering pengujian pemulihan bencana dilakukan?", expected: ["POJK 11/POJK.03/2022|Pasal 20"]}
+- {q: "Siapa yang menyetujui kebijakan keamanan siber bank?", expected: ["POJK 11/POJK.03/2022|Pasal 5"]}
+- {q: "Kapan laporan transaksi keuangan mencurigakan disampaikan ke PPATK?", expected: ["POJK S-08/2023|Pasal 12"]}
+- {q: "Kapan identifikasi dan verifikasi calon nasabah dilakukan?", expected: ["POJK S-08/2023|Pasal 4"]}
+- {q: "Seberapa sering pengkinian data nasabah berisiko tinggi?", expected: ["POJK S-08/2023|Pasal 15"]}
+- {q: "Apakah boleh membuka rekening anonim?", expected: ["POJK S-08/2023|Pasal 21"]}
+- {q: "Berapa lama dokumen nasabah ditatausahakan setelah hubungan usaha berakhir?", expected: ["POJK S-08/2023|Pasal 30"]}
+- {q: "Berapa hari tindak lanjut pengaduan konsumen?", expected: ["POJK S-22/2023|Pasal 33", "PBI S-03/2023|Pasal 14"]}
+- {q: "Kapan ringkasan informasi produk diberikan kepada calon konsumen?", expected: ["POJK S-22/2023|Pasal 19"]}
+- {q: "Laporan penanganan pengaduan disampaikan setiap kapan?", expected: ["POJK S-22/2023|Pasal 44"]}
+- {q: "Layanan pengaduan untuk penyandang disabilitas", expected: ["POJK S-22/2023|Pasal 50"]}
+- {q: "Berapa kali uji penetrasi sistem elektronik kritikal setahun?", expected: ["SEOJK S-29/2022|Pasal 7"]}
+- {q: "Kapan insiden siber dilaporkan ke OJK?", expected: ["SEOJK S-29/2022|Pasal 9"]}
+- {q: "Penilaian tingkat maturitas keamanan siber", expected: ["SEOJK S-29/2022|Pasal 3"]}
+- {q: "Kapan laporan pelaksanaan tata kelola disampaikan direksi?", expected: ["POJK S-17/2023|Pasal 26"]}
+- {q: "Siapa ketua komite pemantau risiko?", expected: ["POJK S-17/2023|Pasal 31"]}
+- {q: "Apakah direksi boleh merangkap jabatan di lembaga jasa keuangan lain?", expected: ["POJK S-17/2023|Pasal 38"]}
+- {q: "Kapan laporan berkala penyelenggara jasa pembayaran ke Bank Indonesia?", expected: ["PBI S-23/2021|Pasal 47"]}
+- {q: "Evaluasi kinerja penyedia jasa alih daya", expected: ["POJK S-12/2024|Pasal 11"]}
+- {q: "Penyesuaian perjanjian alih daya paling lambat kapan?", expected: ["POJK S-12/2024|Pasal 27"]}
+- {q: "Berapa persen giro wajib minimum rupiah?", expected: ["PBI S-07/2024|Pasal 4"]}
+- {q: "Kapan laporan suku bunga dasar kredit disampaikan?", expected: ["PBI S-14/2023|Pasal 5"]}
+- {q: "Laporan kegiatan penukaran valuta asing", expected: ["PADG S-11/2022|Pasal 2"]}
+- {q: "Kapan laporan profil risiko disampaikan setiap triwulan?", expected: ["POJK S-18/2016|Pasal 21"]}
+- {q: "Berapa modal minimum sesuai profil risiko?", expected: ["POJK S-11/2016|Pasal 2"]}
+- {q: "Kapan laporan keuangan triwulanan dipublikasikan?", expected: ["POJK S-37/2019|Pasal 5"]}
+- {q: "Kapan rencana bisnis disampaikan ke OJK?", expected: ["POJK S-05/2016|Pasal 17"]}
+- {q: "Laporan transaksi keuangan tunai ke PPATK", expected: ["UU S-08/2010|Pasal 23"]}
