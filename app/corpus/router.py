@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from pathlib import Path
+from uuid import uuid4
 
 from app.corpus import services
 from app.corpus.models import ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, TaxonomyLabel
@@ -86,19 +88,112 @@ def list_documents(db: Session = Depends(get_db), _: AppUser = Depends(current_u
     return ResponseWrapper(data=out)
 
 
-@router.post("/api/v1/corpus/documents/{doc_id}/versions", response_model=ResponseWrapper[dict])
-async def upload_version(doc_id: str, file: UploadFile = File(...), effective_date: date = Form(...),
-                         origin_url: str = Form("upload://manual"), db: Session = Depends(get_db),
-                         user: AppUser = Depends(ANALYST)):
+@router.post("/api/v1/corpus/documents/{doc_id}/versions",
+             response_model=ResponseWrapper[dict])
+async def upload_version(
+    doc_id: str,
+    file: UploadFile = File(...),
+    effective_date: date = Form(...),
+    origin_url: str = Form("upload://manual"),
+    db: Session = Depends(get_db),
+    user: AppUser = Depends(ANALYST)
+):
     doc = _get(db, Document, doc_id)
+
+    # 1. Validasi nama dan ekstensi file
+    original_name = (file.filename or "").replace("\\", "/")
+    filename = Path(original_name).name
+    suffix = Path(filename).suffix.lower()
+
+    if suffix not in {".pdf", ".txt"}:
+        raise AppError(
+            415,
+            "UNSUPPORTED_FILE",
+            "Format unggahan harus PDF atau TXT"
+        )
+
+    # 2. Membaca isi file
     data = await file.read()
-    key = f"{doc.canonical_number.replace('/', '_').replace(' ', '_')}/{file.filename}"
-    put_object(key, data)
-    dv, n = services.ingest_version(db, doc, file.filename or "", data, effective_date, origin_url, key)
-    audit(db, user.id, "VERSION_INGESTED", "document_version", dv.id, after={"provisions": n})
+
+    if not data:
+        raise AppError(
+            422,
+            "EMPTY_FILE",
+            "Berkas yang diunggah kosong"
+        )
+
+    # 3. Membatasi ukuran file maksimal 30 MB
+    if len(data) > 30 * 1024 * 1024:
+        raise AppError(
+            413,
+            "FILE_TOO_LARGE",
+            "Ukuran berkas maksimum adalah 30 MB"
+        )
+
+    # 4. Memeriksa signature PDF
+    if suffix == ".pdf" and b"%PDF-" not in data[:1024]:
+        raise AppError(
+            422,
+            "INVALID_PDF",
+            "Berkas tidak memiliki signature PDF yang valid"
+        )
+
+    # 5. Membuat nama objek penyimpanan yang unik
+    safe_doc = "".join(
+        c if c.isalnum() or c in "-_" else "_"
+        for c in doc.canonical_number
+    )
+
+    key = f"{safe_doc}/{uuid4().hex}{suffix}"
+
+    content_type = (
+        "application/pdf"
+        if suffix == ".pdf"
+        else "text/plain; charset=utf-8"
+    )
+
+    # 6. Ekstraksi teks dan segmentasi pasal
+    dv, n = services.ingest_version(
+        db,
+        doc,
+        filename,
+        data,
+        effective_date,
+        origin_url,
+        key
+    )
+
+    # 7. Menyimpan file ke storage
+    if not put_object(key, data, content_type=content_type):
+        db.rollback()
+        raise AppError(
+            503,
+            "STORAGE_UNAVAILABLE",
+            "Berkas gagal disimpan. Periksa konfigurasi "
+            "dan hak akses storage."
+        )
+
+    # 8. Mencatat aktivitas upload
+    audit(
+        db,
+        user.id,
+        "VERSION_INGESTED",
+        "document_version",
+        dv.id,
+        after={"provisions": n}
+    )
+
+    # 9. Menyimpan transaksi database
     db.commit()
-    return ResponseWrapper(data={"version_id": str(dv.id), "version_number": dv.version_number,
-                                 "provisions_created": n, "state": dv.state})
+
+    return ResponseWrapper(
+        data={
+            "version_id": str(dv.id),
+            "version_number": dv.version_number,
+            "provisions_created": n,
+            "state": dv.state
+        }
+    )
 
 
 @router.get("/api/v1/corpus/versions/{version_id}/provisions", response_model=ResponseWrapper[list])

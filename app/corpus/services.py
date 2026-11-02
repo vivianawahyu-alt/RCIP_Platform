@@ -17,12 +17,77 @@ from app.shared.vocabularies import ChangeType, DocumentStatus, ProvisionType, V
 
 
 def extract_text(filename: str, data: bytes) -> str:
-    if filename.lower().endswith(".pdf"):
-        doc = pymupdf.open(stream=data, filetype="pdf")
-        return "\n".join(page.get_text("text") for page in doc)
-    if filename.lower().endswith(".txt"):
-        return data.decode("utf-8", errors="replace")
-    raise AppError(400, "UNSUPPORTED_FILE", "Hanya berkas .pdf atau .txt yang didukung")
+    suffix = (
+        filename.lower().rsplit(".", 1)[-1]
+        if "." in filename else ""
+    )
+
+    # Validasi file kosong
+    if not data:
+        raise AppError(
+            422,
+            "EMPTY_FILE",
+            "Berkas yang diunggah kosong"
+        )
+
+    # Membaca PDF
+    if suffix == "pdf":
+
+        if b"%PDF-" not in data[:1024]:
+            raise AppError(
+                422,
+                "INVALID_PDF",
+                "Berkas bukan PDF yang valid"
+            )
+
+        try:
+            with pymupdf.open(
+                stream=data,
+                filetype="pdf"
+            ) as doc:
+
+                # Memeriksa PDF yang dilindungi password
+                if doc.needs_pass:
+                    raise AppError(
+                        422,
+                        "PDF_PASSWORD_PROTECTED",
+                        "PDF dilindungi kata sandi."
+                    )
+
+                # Mengekstrak teks seluruh halaman
+                return "\n".join(
+                    page.get_text("text")
+                    for page in doc
+                )
+
+        except AppError:
+            raise
+
+        except Exception as exc:
+            raise AppError(
+                422,
+                "INVALID_PDF",
+                "PDF rusak atau tidak dapat dibaca. "
+                "Coba ekspor ulang PDF lalu unggah kembali."
+            ) from exc
+
+    # Membaca file TXT
+    if suffix == "txt":
+        try:
+            return data.decode("utf-8-sig")
+
+        except UnicodeDecodeError as exc:
+            raise AppError(
+                422,
+                "INVALID_TEXT_FILE",
+                "File TXT harus menggunakan encoding UTF-8."
+            ) from exc
+
+    raise AppError(
+        415,
+        "UNSUPPORTED_FILE",
+        "Hanya berkas .pdf atau .txt yang didukung"
+    )
 
 
 def get_or_create_source(db: Session, name: str, category: str, issuer: str, base_url: str) -> RegulatorySource:
@@ -34,20 +99,85 @@ def get_or_create_source(db: Session, name: str, category: str, issuer: str, bas
     return src
 
 
-def persist_segments(db: Session, dv: DocumentVersion, segments: list[Segment]) -> int:
-    for seq, seg in enumerate(segments, start=1):
-        prov = db.scalar(select(Provision).where(Provision.document_id == dv.document_id,
-                                                 Provision.provision_key == seg.provision_key))
+def persist_segments(
+    db: Session,
+    dv: DocumentVersion,
+    segments: list[Segment]
+) -> int:
+
+    # 1. Kelompokkan segmen berdasarkan provision_key
+    grouped_segments = {}
+
+    for seg in segments:
+        key = seg.provision_key
+
+        if not key:
+            raise AppError(
+                422,
+                "INVALID_PROVISION_KEY",
+                "Segmen memiliki identitas pasal kosong."
+            )
+
+        if key not in grouped_segments:
+            grouped_segments[key] = {
+                "number_label": seg.number_label,
+                "hierarchical_path": seg.hierarchical_path,
+                "texts": [],
+                "confidence": seg.confidence
+            }
+
+        grouped_segments[key]["texts"].append(seg.text)
+
+        grouped_segments[key]["confidence"] = max(
+            grouped_segments[key]["confidence"],
+            seg.confidence
+        )
+
+    # 2. Simpan satu ProvisionVersion untuk setiap pasal
+    for seq, (key, item) in enumerate(
+        grouped_segments.items(),
+        start=1
+    ):
+
+        prov = db.scalar(
+            select(Provision).where(
+                Provision.document_id == dv.document_id,
+                Provision.provision_key == key
+            )
+        )
+
         if not prov:
-            prov = Provision(document_id=dv.document_id, provision_key=seg.provision_key,
-                             provision_type=ProvisionType.PASAL.value, number_label=seg.number_label,
-                             hierarchical_path=seg.hierarchical_path)
+            prov = Provision(
+                document_id=dv.document_id,
+                provision_key=key,
+                provision_type=ProvisionType.PASAL.value,
+                number_label=item["number_label"],
+                hierarchical_path=item["hierarchical_path"]
+            )
+
             db.add(prov)
             db.flush()
-        db.add(ProvisionVersion(provision_id=prov.id, document_version_id=dv.id, sequence=seq, text=seg.text,
-                                segmentation_confidence=seg.confidence))
+
+        # Gabungkan teks jika pasal ditemukan lebih dari sekali
+        combined_text = "\n\n".join(
+            text.strip()
+            for text in item["texts"]
+            if text and text.strip()
+        )
+
+        db.add(
+            ProvisionVersion(
+                provision_id=prov.id,
+                document_version_id=dv.id,
+                sequence=seq,
+                text=combined_text,
+                segmentation_confidence=item["confidence"]
+            )
+        )
+
     db.flush()
-    return len(segments)
+
+    return len(grouped_segments)
 
 
 def ingest_version(db: Session, document: Document, filename: str, data: bytes, effective_date: date,
