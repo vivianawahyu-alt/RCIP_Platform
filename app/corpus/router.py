@@ -1,7 +1,10 @@
 from datetime import date
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+import uuid  # untuk object_id audit dokumen/versi yang dihapus
+
+from sqlalchemy import func, select  # func.count() untuk menghitung rujukan
+from sqlalchemy.exc import DBAPIError  # menangkap penolakan foreign key / trigger DB
 from sqlalchemy.orm import Session
 from pathlib import Path
 from uuid import uuid4
@@ -256,3 +259,134 @@ def compute(body: ChangeRequest, db: Session = Depends(get_db), user: AppUser = 
            for c in changes]
     db.commit()
     return ResponseWrapper(data={"change_set_id": str(cs.id), "changes": sorted(out, key=lambda x: x["provision"])})
+
+
+# ---------- hapus & tarik (korpus dan versi korpus) ----------
+class WithdrawRequest(BaseModel):
+    """Isi body untuk tarik versi: alasan wajib (dicatat di jejak audit)."""
+    reason: str
+
+
+def _version_refs(db: Session, dv: DocumentVersion) -> dict:
+    """Hitung rekaman kepatuhan yang menyitasi versi ini; selama masih ada, versi tidak boleh hilang dari korpus."""
+    from app.compliance.models import ApplicabilityDecision, Obligation
+    pv_ids = select(ProvisionVersion.id).where(ProvisionVersion.document_version_id == dv.id)
+    return {
+        "kewajiban": db.scalar(select(func.count()).select_from(Obligation)
+                               .where(Obligation.primary_citation_id.in_(pv_ids))) or 0,
+        "keputusan_keberlakuan": db.scalar(select(func.count()).select_from(ApplicabilityDecision)
+                                           .where(ApplicabilityDecision.target_version_id == dv.id)) or 0,
+        "perbandingan_versi": db.scalar(select(func.count()).select_from(ChangeSet).where(
+            (ChangeSet.base_version_id == dv.id) | (ChangeSet.new_version_id == dv.id))) or 0,
+    }
+
+
+def _block_if_referenced(refs: dict, what: str) -> None:
+    used = {k: v for k, v in refs.items() if v}
+    if used:
+        detail = ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in used.items())
+        raise AppError(409, "STILL_REFERENCED", f"{what} masih dirujuk oleh {detail}", used)
+
+
+def _delete_draft_version(db: Session, dv: DocumentVersion) -> int:
+    # Urutan: hapus teks pasal versi ini → hapus identitas pasal yatim → hapus versinya (urutan FK)
+    """Hapus versi draf beserta pasalnya; identitas pasal (Provision) yang tidak dipakai versi lain ikut dihapus."""
+    pvs = db.scalars(select(ProvisionVersion).where(ProvisionVersion.document_version_id == dv.id)).all()
+    prov_ids = {pv.provision_id for pv in pvs}
+    for pv in pvs:
+        db.delete(pv)
+    db.flush()
+    for pid in prov_ids:
+        if not db.scalar(select(ProvisionVersion.id).where(ProvisionVersion.provision_id == pid).limit(1)):
+            db.delete(db.get(Provision, pid))
+    db.delete(dv)
+    db.flush()
+    return len(pvs)
+
+
+@router.delete("/api/v1/corpus/versions/{version_id}", response_model=ResponseWrapper[dict])
+def delete_version(version_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+    """Hanya versi DRAF yang dapat dihapus. Versi terbit imutabel (trigger DB) → gunakan 'tarik versi'."""
+    dv = _get(db, DocumentVersion, version_id)
+    # 1) versi terbit/ditarik dikunci trigger DB → tolak
+    if dv.state in (VersionState.PUBLISHED.value, VersionState.WITHDRAWN.value):
+        raise AppError(409, "VERSION_IMMUTABLE",
+                       "Versi yang sudah terbit tidak dapat dihapus; gunakan 'Tarik versi' agar riwayatnya tetap dapat diaudit")
+    # 2) tolak bila masih dipakai keputusan keberlakuan/kewajiban/perbandingan
+    _block_if_referenced(_version_refs(db, dv), f"Versi {dv.version_number}")
+    # 3) simpan ringkasan sebelum dihapus untuk jejak audit
+    snapshot = {"document_id": str(dv.document_id), "version_number": dv.version_number, "sha256": dv.sha256,
+                "state": dv.state, "origin_url": dv.origin_url}
+    try:
+        n = _delete_draft_version(db, dv)
+    except DBAPIError as e:
+        db.rollback()
+        raise AppError(409, "STILL_REFERENCED", f"Versi masih dirujuk data lain: {str(e.orig).splitlines()[0]}")
+    audit(db, user.id, "VERSION_DELETED", "document_version", uuid.UUID(version_id), before={**snapshot, "provisions": n})
+    db.commit()
+    return ResponseWrapper(data={"deleted_version_id": version_id, "provisions_deleted": n})
+
+
+@router.post("/api/v1/corpus/versions/{version_id}/withdraw", response_model=ResponseWrapper[dict])
+def withdraw_version(version_id: str, body: WithdrawRequest, db: Session = Depends(get_db),
+                     user: AppUser = Depends(ANALYST)):
+    """Versi terbit ditarik (WITHDRAWN), bukan dihapus: tidak lagi dipakai pencarian/copilot/ekstraksi,
+    tetapi teks dan jejaknya tetap tersimpan. Diblokir bila masih ada kewajiban yang menyitasinya."""
+    dv = _get(db, DocumentVersion, version_id)
+    if dv.state != VersionState.PUBLISHED.value:
+        raise AppError(409, "INVALID_STATE", f"Hanya versi terbit yang dapat ditarik (status sekarang {dv.state})")
+    if not body.reason.strip():
+        raise AppError(422, "REASON_REQUIRED", "Alasan penarikan wajib diisi", {"field": "reason"})
+    # kewajiban yang menyitasi versi ini akan kehilangan dasar → tolak
+    refs = _version_refs(db, dv)
+    _block_if_referenced({"kewajiban": refs["kewajiban"]}, f"Versi {dv.version_number}")
+    # trigger DB hanya mengizinkan PUBLISHED → WITHDRAWN (teks pasal tidak berubah)
+    dv.state = VersionState.WITHDRAWN.value
+    db.flush()
+    doc = db.get(Document, dv.document_id)
+    if not db.scalar(select(DocumentVersion.id).where(DocumentVersion.document_id == doc.id,
+                                                      DocumentVersion.state == VersionState.PUBLISHED.value).limit(1)):
+        doc.status = "DRAFT"  # tidak ada lagi versi berlaku di korpus
+    audit(db, user.id, "VERSION_WITHDRAWN", "document_version", dv.id,
+          before={"state": "PUBLISHED"}, after={"state": dv.state, "reason": body.reason.strip()})
+    db.commit()
+    return ResponseWrapper(data={"version_id": str(dv.id), "state": dv.state, "document_status": doc.status})
+
+
+@router.delete("/api/v1/corpus/documents/{doc_id}", response_model=ResponseWrapper[dict])
+def delete_document(doc_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+    """Dokumen hanya dapat dihapus bila belum pernah terbit (semua versinya draf) dan tidak dirujuk relasi."""
+    from app.corpus.models import Relationship
+    doc = _get(db, Document, doc_id)
+    versions = db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == doc.id)).all()
+    # 1) dokumen yang pernah terbit tidak boleh hilang dari riwayat
+    if any(v.state in (VersionState.PUBLISHED.value, VersionState.WITHDRAWN.value) for v in versions):
+        raise AppError(409, "DOCUMENT_HAS_PUBLISHED_VERSION",
+                       "Dokumen yang pernah terbit tidak dapat dihapus karena teksnya bisa sudah disitasi; tarik versinya saja")
+    rels = db.scalars(select(Relationship).where((Relationship.source_document_id == doc.id)
+                                                 | (Relationship.target_document_id == doc.id))).all()
+    # 2) relasi terkonfirmasi (mis. mencabut dokumen lain) tidak boleh putus
+    if any(r.state == "CONFIRMED" for r in rels):
+        raise AppError(409, "STILL_REFERENCED", "Dokumen masih memiliki relasi terkonfirmasi dengan dokumen lain")
+    for v in versions:
+        _block_if_referenced(_version_refs(db, v), f"Versi {v.version_number}")
+    snapshot = {"canonical_number": doc.canonical_number, "title_id": doc.title_id, "versions": len(versions)}
+    # 3) hapus berurutan: relasi usulan → label → versi draf & pasalnya → identitas pasal → dokumen
+    try:
+        for r in rels:
+            db.delete(r)
+        for lb in db.scalars(select(TaxonomyLabel).where(TaxonomyLabel.document_id == doc.id)):
+            db.delete(lb)
+        for v in versions:
+            _delete_draft_version(db, v)
+        for p in db.scalars(select(Provision).where(Provision.document_id == doc.id)):
+            db.delete(p)
+        db.flush()
+        db.delete(doc)
+        db.flush()
+    except DBAPIError as e:
+        db.rollback()
+        raise AppError(409, "STILL_REFERENCED", f"Dokumen masih dirujuk data lain: {str(e.orig).splitlines()[0]}")
+    audit(db, user.id, "DOCUMENT_DELETED", "document", uuid.UUID(doc_id), before=snapshot)
+    db.commit()
+    return ResponseWrapper(data={"deleted_document_id": doc_id})

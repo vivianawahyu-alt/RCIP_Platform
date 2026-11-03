@@ -212,6 +212,15 @@ table.data tr.selected td { background: var(--teal-soft); }
 .login-shell { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
 .login-art { background: var(--ink); color: #dfe5ef; padding: 56px; display: flex; flex-direction: column; justify-content: space-between; }
 .login-art h1 { font-size: 40px; color: #fff; max-width: 15ch; line-height: 1.12; }
+/* teks pasal di Korpus: rata kanan-kiri; hyphens + lang="id" mencegah celah lebar antarkata */
+.verbatim.justify { text-align: justify; hyphens: auto; }
+/* pengelompokan BAB → Pasal di Korpus */
+details.bab { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+details.bab:first-of-type { border-top: 0; margin-top: 0; }
+details.bab > summary { cursor: pointer; list-style: revert; padding: 4px 0; }
+.bab-title { font-family: var(--serif); font-size: 19px; font-weight: 700; color: var(--ink); }
+/* teks merah untuk tombol Hapus (tanpa bingkai) */
+.btn.danger-text { color: var(--red); }
 .login-art .verbatim { color: #f1e7c8; border-color: var(--seal); font-size: 17px; }
 .login-form { display: grid; place-items: center; padding: 32px; background: var(--paper); }
 .login-form form { width: 100%; max-width: 360px; }
@@ -221,9 +230,10 @@ table.data tr.selected td { background: var(--teal-soft); }
 .persona b { display: block; font-size: 13px; }
 
 footer.site { background: var(--ink); color: #b9c2d3; margin-top: 30px; font-size: 13px; }
-footer.site .wrap { padding: 28px 24px; display: grid; grid-template-columns: 1fr 2fr; gap: 28px; }
+/* footer: satu blok di tengah (RCIP + Capstone V-TEKI × UKDW.) */
+footer.site .wrap { padding: 24px; text-align: center; }
 footer.site b { color: #fff; font-family: var(--serif); font-size: 18px; }
-footer.site p { margin: 6px 0 0; line-height: 1.6; max-width: 90ch; }
+footer.site p { margin: 6px auto 0; /* auto = paragraf ikut di tengah */ line-height: 1.6; max-width: 90ch; }
 
 ins { background: #d9f2e3; text-decoration: none; padding: 0 2px; }
 del { background: #fbdcd8; padding: 0 2px; }
@@ -235,7 +245,6 @@ pre.answer { white-space: pre-wrap; font-family: var(--serif); font-size: 15.5px
   .sevbar { grid-template-columns: repeat(3, 1fr); }
   .detail { position: static; }
   .login-art { padding: 32px; }
-  footer.site .wrap { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .wrap { padding: 0 16px; }

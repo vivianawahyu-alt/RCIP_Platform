@@ -105,9 +105,9 @@ export default function App() {
       {page === "copilot" && <Copilot ctx={ctx} />}
       {page === "cari" && <Cari ctx={ctx} kind={decodeURIComponent(param || "Semua")} q={decodeURIComponent(route.split("/").slice(2).join("/"))} />}
     </main>
+    {/* Footer ringkas: nama aplikasi + program, rata tengah (lihat footer.site di styles.css) */}
     <footer className="site"><div className="wrap">
-      <div><b>RCIP</b><p>Capstone V-TEKI × UKDW. Seluruh data organisasi dan korpus demo bersifat sintetis.</p></div>
-      <p>Platform ini menstrukturkan teks peraturan publik menjadi rekaman kepatuhan. Bukan nasihat hukum dan tidak menyampaikan apa pun kepada regulator. Konten berlabel draf AI memerlukan validasi manusia; setiap keputusan dicatat atas nama orang yang mengambilnya.</p>
+      <b>RCIP</b><p>Capstone V-TEKI × UKDW.</p>
     </div></footer>
     {cite && <div className="modal" onClick={() => setCite(null)}><div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Teks pasal">
       <div className="crumbs">{cite.document.issuer} · {cite.document.title_id}</div>

@@ -6,7 +6,23 @@ import type { Ctx } from "../ui";
 import { Empty, Flow, PageHead, Status, can, fmtDate, useAction, useLoad } from "../ui";
 
 type Prov = { provision_version_id: string; number_label: string; path: string; text: string; confidence: number; corrected_by_human: boolean };
+// Satu kelompok BAB berisi daftar pasalnya (dipakai untuk tampilan BAB → Pasal)
+type BabGroup = { bab: string; pasal: Prov[] };
 
+/** Kelompokkan pasal per BAB (array of array): [{ bab: "BAB I", pasal: [Pasal 1, Pasal 2] }, ...].
+ *  Sumbernya `path` dari segmenter ("BAB I/Pasal 1"); pasal tanpa BAB masuk grup "Tanpa BAB". Urutan pasal dipertahankan. */
+function groupByBab(provs: Prov[]): BabGroup[] {
+  const groups: BabGroup[] = [];
+  for (const p of provs) {
+    const bab = p.path.includes("/") ? p.path.split("/")[0] : "Tanpa BAB";
+    const last = groups[groups.length - 1];
+    if (last && last.bab === bab) last.pasal.push(p);
+    else groups.push({ bab, pasal: [p] });
+  }
+  return groups;
+}
+
+// Halaman "Korpus & pasal": daftar dokumen (kanan) dan isi pasal versi terpilih (kiri)
 export function Regulasi({ ctx }: { ctx: Ctx }) {
   const [docs, reload] = useLoad<Doc[]>(() => api("/corpus/documents"), [], ctx.notify);
   const [sel, setSel] = useState<string>("");
@@ -34,11 +50,16 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
       <div>
         {selVer ? <section className="panel">
           <header><div><h2>{selDoc?.canonical_number}</h2><p>{selDoc?.title_id} · versi {selVer.version_number}, berlaku {fmtDate(selVer.effective_date)}</p></div><Status s={selVer.state} /></header>
-          {provs.length ? <ul className="list">{provs.map(p => <li key={p.provision_version_id}>
-            <div className="between"><div><b style={{ fontFamily: "var(--serif)", fontSize: 17 }}>{p.number_label}</b> <span className="small muted">{p.path} · keyakinan segmentasi {p.confidence}</span></div>
-              {officer && selVer.state === "PUBLISHED" && <button className="btn sm" disabled={busy} onClick={() => extract(p.provision_version_id)}>Ekstrak kewajiban</button>}</div>
-            <div className="verbatim">{p.text}</div>
-          </li>)}</ul> : <Empty>Versi ini belum memiliki pasal.</Empty>}
+          {/* Pasal dikelompokkan per BAB; setiap BAB bisa dilipat/dibuka */}
+          {provs.length ? groupByBab(provs).map(g => <details key={g.bab} className="bab" open>
+            <summary><span className="bab-title">{g.bab}</span> <span className="small muted">{g.pasal.length} pasal</span></summary>
+            <ul className="list">{g.pasal.map(p => <li key={p.provision_version_id}>
+              <div className="between"><div><b style={{ fontFamily: "var(--serif)", fontSize: 17 }}>{p.number_label}</b> <span className="small muted">keyakinan segmentasi {p.confidence}</span></div>
+                {officer && selVer.state === "PUBLISHED" && <button className="btn sm" disabled={busy} onClick={() => extract(p.provision_version_id)}>Ekstrak kewajiban</button>}</div>
+              {/* Teks pasal rata kanan-kiri; lang="id" agar pemenggalan kata mengikuti bahasa Indonesia */}
+              <div className="verbatim justify" lang="id">{p.text}</div>
+            </li>)}</ul>
+          </details>) : <Empty>Versi ini belum memiliki pasal.</Empty>}
         </section> : <Empty>Pilih versi dokumen di samping untuk membaca pasalnya.</Empty>}
       </div>
       <aside>
@@ -48,9 +69,12 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
             <div className="between"><div className="title">{d.canonical_number}</div><Status s={d.status} /></div><div className="sub">{d.issuer} · {d.title_id}</div>
             {!!d.labels?.length && <div className="row" style={{ marginTop: 6, gap: 4 }}>{d.labels.map((l, i) => <span key={i} className={`badge ${l.state === "CONFIRMED" ? "teal" : ""}`} title={`${l.dimension} · ${l.state === "CONFIRMED" ? "terkonfirmasi" : "saran aturan"}`}>{l.value}</span>)}</div>}
             <div className="row" style={{ marginTop: 8 }}>{d.versions.map(v => <span key={v.id} className="row" style={{ gap: 4 }}>
-              <button className={`btn sm ${v.id === sel ? "primary" : ""}`} onClick={() => setSel(v.id)}>v{v.version_number}</button>
-              {analyst && v.state !== "PUBLISHED" && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/versions/${v.id}/publish`, { method: "POST" }), `Versi ${v.version_number} dipublikasikan dan dibekukan.`)}>Publikasikan</button>}
+              {/* Tombol pilih versi; versi yang ditarik diberi keterangan "(ditarik)" */}
+              <button className={`btn sm ${v.id === sel ? "primary" : ""}`} onClick={() => setSel(v.id)}>v{v.version_number}{v.state === "WITHDRAWN" ? " (ditarik)" : ""}</button>
+              {analyst && v.state !== "PUBLISHED" && v.state !== "WITHDRAWN" && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/versions/${v.id}/publish`, { method: "POST" }), `Versi ${v.version_number} dipublikasikan dan dibekukan.`)}>Publikasikan</button>}
             </span>)}</div>
+            {/* Tombol Hapus/Tarik versi & Hapus dokumen (khusus Analis); kosongkan pilihan bila versi yang dibuka ikut terhapus */}
+            {analyst && <CorpusActions doc={d} busy={busy} run={run} onRemoved={id => { if (d.versions.some(v => v.id === sel) && (id === d.id || id === sel)) setSel(""); }} />}
             {analyst && <label className="field" style={{ marginTop: 10 }}>Unggah versi baru (.pdf/.txt)<input type="file" accept=".pdf,.txt" onChange={e => upload(e, d.id)} /></label>}
           </li>)}</ul> : <Empty>Belum ada dokumen.</Empty>}
         </section>
@@ -67,6 +91,46 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
       </aside>
     </div>
   </>;
+}
+
+// Tipe fungsi run() dari useAction: menjalankan aksi API lalu menampilkan pesan sukses/gagal
+type Run = (fn: () => Promise<unknown>, okText?: string) => Promise<boolean>;
+
+/** Hapus versi draf / dokumen yang belum pernah terbit; tarik (bukan hapus) versi yang sudah terbit.
+ *  Konfirmasi dua langkah di dalam halaman agar tidak terhapus karena salah klik. */
+function CorpusActions({ doc, busy, run, onRemoved }: { doc: Doc; busy: boolean; run: Run; onRemoved: (id: string) => void }) {
+  // Aksi yang sedang menunggu konfirmasi (null = belum ada yang diklik)
+  const [pending, setPending] = useState<{ kind: "version" | "withdraw" | "document"; id: string; label: string } | null>(null);
+  // Alasan penarikan (wajib untuk "Tarik versi")
+  const [reason, setReason] = useState("");
+  // Dokumen yang pernah terbit tidak boleh dihapus → tombol "Hapus dokumen" disembunyikan
+  const everPublished = doc.versions.some(v => v.state === "PUBLISHED" || v.state === "WITHDRAWN");
+  // Dijalankan saat klik "Ya, hapus/tarik": panggil endpoint sesuai jenis aksi, lalu tutup konfirmasi bila berhasil
+  const go = async () => {
+    if (!pending) return;
+    const ok = pending.kind === "version" ? await run(() => api(`/corpus/versions/${pending.id}`, { method: "DELETE" }), `${pending.label} dihapus.`)
+      : pending.kind === "withdraw" ? await run(() => api(`/corpus/versions/${pending.id}/withdraw`, { body: { reason } }), `${pending.label} ditarik dari korpus.`)
+      : await run(() => api(`/corpus/documents/${pending.id}`, { method: "DELETE" }), `Dokumen ${doc.canonical_number} dihapus.`);
+    if (ok) { onRemoved(pending.id); setPending(null); setReason(""); }
+  };
+  return <div style={{ marginTop: 8 }}>
+    {/* Tahap 1: tombol aksi. Versi terbit → "Tarik", versi draf → "Hapus" */}
+    {!pending && <div className="row" style={{ gap: 4 }}>
+      {doc.versions.map(v => v.state === "WITHDRAWN" ? null : v.state === "PUBLISHED"
+        ? <button key={v.id} className="btn sm ghost" disabled={busy} onClick={() => setPending({ kind: "withdraw", id: v.id, label: `Versi ${v.version_number}` })}>Tarik v{v.version_number}</button>
+        : <button key={v.id} className="btn sm ghost danger-text" disabled={busy} onClick={() => setPending({ kind: "version", id: v.id, label: `Versi ${v.version_number}` })}>Hapus v{v.version_number}</button>)}
+      {!everPublished && <button className="btn sm ghost danger-text" disabled={busy} onClick={() => setPending({ kind: "document", id: doc.id, label: doc.canonical_number })}>Hapus dokumen</button>}
+    </div>}
+    {/* Tahap 2: kotak konfirmasi agar tidak terhapus karena salah klik */}
+    {pending && <div className="decision" style={{ marginTop: 6 }}>
+      <p className="small" style={{ marginTop: 0 }}>{pending.kind === "withdraw"
+        ? <>Tarik <b>{pending.label}</b>? Versi tidak lagi dipakai pencarian, copilot, dan ekstraksi, tetapi teks & jejak auditnya tetap tersimpan.</>
+        : <>Hapus <b>{pending.label}</b> secara permanen? Tindakan ini tidak dapat dibatalkan dan tercatat di jejak audit.</>}</p>
+      {pending.kind === "withdraw" && <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Alasan penarikan (wajib)" style={{ width: "100%", marginBottom: 6 }} />}
+      <div className="row"><button className="btn sm danger" disabled={busy || (pending.kind === "withdraw" && !reason.trim())} onClick={go}>{pending.kind === "withdraw" ? "Ya, tarik" : "Ya, hapus"}</button>
+        <button className="btn sm ghost" onClick={() => { setPending(null); setReason(""); }}>Batal</button></div>
+    </div>}
+  </div>;
 }
 
 const CHANGE_LABEL: Record<string, string> = { TEXT_MODIFIED: "Teks diubah", PROVISION_ADDED: "Pasal ditambahkan", PROVISION_DELETED: "Pasal dihapus" };
