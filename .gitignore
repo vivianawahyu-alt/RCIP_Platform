@@ -5,3 +5,6 @@ web/dist/
 __pycache__/
 .pytest_cache/
 *.sql
+
+# Jadwal runtime Celery beat (dibuat otomatis oleh worker)
+celerybeat-schedule*

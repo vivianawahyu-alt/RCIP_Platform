@@ -56,7 +56,9 @@ def test_end_to_end(client):
     # 12 gap -> finding otomatis; 13 remediasi
     scan = client.post(f"{P}/compliance/gaps/scan", headers=officer).json()["data"]["findings_created"]
     assert scan
-    assert client.post(f"{P}/compliance/findings/{scan[0]}/remediation", headers=owner,
+    # pada DB baru, pemindaian juga memunculkan kesenjangan data seed milik pemilik lain → pilih temuan kewajiban ini
+    mine = next(f for f in scan if client.get(f"{P}/compliance/findings/{f}", headers=officer).json()["data"]["obligation"]["id"] == ob)
+    assert client.post(f"{P}/compliance/findings/{mine}/remediation", headers=owner,
                        json={"description": "Buat kontrol", "due_date": str(date.today() + timedelta(days=30))}).status_code == 200
 
     # 9-11 kontrol, bukti, asesmen
