@@ -1,0 +1,34 @@
+{
+  "canonical_number": "PADG S-11/2022",
+  "created_at": "2018-08-15T17:26:00.000000+00:00",
+  "deleted_at": null,
+  "format": 2,
+  "id": "d701410d-3f4b-4a70-8074-718e425a609f",
+  "instrument_type": "PADG",
+  "issuer": "Bank Indonesia",
+  "labels": [
+    {
+      "dimension": "POPULATION",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "CONFIRMED",
+      "value": "Bank umum"
+    },
+    {
+      "dimension": "THEME",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "SUGGESTED",
+      "value": "Pelaporan dan pengungkapan"
+    }
+  ],
+  "source": {
+    "base_url": "https://www.bi.go.id",
+    "category": "BANK_INDONESIA",
+    "issuer_name": "Bank Indonesia",
+    "name": "BANK_INDONESIA",
+    "permitted_use_statement": null,
+    "status": "ACTIVE"
+  },
+  "title_id": "Pelaporan Kegiatan Penukaran Valuta Asing oleh Bank Umum"
+}

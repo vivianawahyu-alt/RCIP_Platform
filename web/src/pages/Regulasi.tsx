@@ -5,7 +5,8 @@ import type { Doc } from "../types";
 import type { Ctx } from "../ui";
 import { Empty, Flow, PageHead, Status, can, fmtDate, useAction, useLoad } from "../ui";
 
-type Prov = { provision_version_id: string; number_label: string; path: string; text: string; confidence: number; corrected_by_human: boolean };
+// [11a] low_confidence_text = true → teks pasal hasil OCR yang belum dikonfirmasi analis
+type Prov = { provision_version_id: string; number_label: string; path: string; text: string; confidence: number; corrected_by_human: boolean; low_confidence_text?: boolean };
 // Satu kelompok BAB berisi daftar pasalnya (dipakai untuk tampilan BAB → Pasal)
 type BabGroup = { bab: string; pasal: Prov[] };
 
@@ -31,14 +32,24 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
   const { run, busy } = useAction(ctx.notify, reload);
   const analyst = can(ctx.me.role, "corpus_write"), officer = can(ctx.me.role, "obligation_extract");
   useEffect(() => { if (!sel && docs?.[0]?.versions.length) setSel(docs[0].versions[docs[0].versions.length - 1].id); }, [docs]);
-  useEffect(() => { if (sel) api<Prov[]>(`/corpus/versions/${sel}/provisions`).then(setProvs).catch(e => ctx.notify("error", e.message)); }, [sel]);
+  // [11b] muat ulang daftar pasal versi terpilih (dipanggil saat ganti versi dan setelah koreksi/konfirmasi teks)
+  const loadProvs = () => { if (sel) api<Prov[]>(`/corpus/versions/${sel}/provisions`).then(setProvs).catch(e => ctx.notify("error", e.message)); };
+  useEffect(loadProvs, [sel]);
   const selDoc = docs?.find(d => d.versions.some(v => v.id === sel));
   const selVer = selDoc?.versions.find(v => v.id === sel);
+  // [11b] draft = versi masih boleh diubah (belum terbit); hanya saat draf tombol koreksi/konfirmasi muncul
+  const draft = !!selVer && ["SEGMENTED_DRAFT", "UNDER_CORRECTION"].includes(selVer.state);
+  // [11b] jumlah pasal OCR yang belum diperiksa → ditampilkan di kotak peringatan
+  const ocrPending = provs.filter(p => p.low_confidence_text).length;
 
   const upload = (e: ChangeEvent<HTMLInputElement>, docId: string) => {
     const f = e.target.files?.[0]; if (!f) return;
     const form = new FormData(); form.append("file", f); form.append("effective_date", new Date().toISOString().slice(0, 10));
-    run(async () => { const r = await api(`/corpus/documents/${docId}/versions`, { form }); setSel(r.version_id); }, "Versi baru diunggah dan tersegmentasi. Periksa pasal lalu publikasikan.");
+    run(async () => {
+      const r = await api(`/corpus/documents/${docId}/versions`, { form }); setSel(r.version_id);
+      // [11c] PDF hasil pindaian: beri tahu halaman mana yang dibaca lewat OCR
+      if (r.extraction_method === "OCR") ctx.notify("ok", `PDF hasil pindaian: halaman ${r.ocr_pages.join(", ")} dibaca lewat OCR. Periksa setiap pasal sebelum publikasi.`);
+    }, "Versi baru diunggah dan tersegmentasi. Periksa pasal lalu publikasikan.");
     e.target.value = "";
   };
   const extract = (pv: string) => run(() => api("/compliance/obligations/extract", { body: { provision_version_id: pv } }),
@@ -49,16 +60,16 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
     <div className="cols">
       <div>
         {selVer ? <section className="panel">
-          <header><div><h2>{selDoc?.canonical_number}</h2><p>{selDoc?.title_id} · versi {selVer.version_number}, berlaku {fmtDate(selVer.effective_date)}</p></div><Status s={selVer.state} /></header>
+          {/* [11d] judul versi; bila teksnya dari OCR ditambah keterangan " · teks via OCR" */}
+          <header><div><h2>{selDoc?.canonical_number}</h2><p>{selDoc?.title_id} · versi {selVer.version_number}, berlaku {fmtDate(selVer.effective_date)}{selVer.extraction_method === "OCR" ? " · teks via OCR" : ""}</p></div><Status s={selVer.state} /></header>
+          {/* [11d] kotak peringatan kuning: publikasi diblokir selama masih ada pasal OCR yang belum dikonfirmasi */}
+          {draft && ocrPending > 0 && <div className="notice warn"><span>{ocrPending} pasal berasal dari OCR dan belum diperiksa. Bandingkan dengan PDF aslinya, lalu klik <b>Konfirmasi teks</b> atau <b>Koreksi teks</b> pada setiap pasal sebelum publikasi.</span></div>}
           {/* Pasal dikelompokkan per BAB; setiap BAB bisa dilipat/dibuka */}
           {provs.length ? groupByBab(provs).map(g => <details key={g.bab} className="bab" open>
             <summary><span className="bab-title">{g.bab}</span> <span className="small muted">{g.pasal.length} pasal</span></summary>
-            <ul className="list">{g.pasal.map(p => <li key={p.provision_version_id}>
-              <div className="between"><div><b style={{ fontFamily: "var(--serif)", fontSize: 17 }}>{p.number_label}</b> <span className="small muted">keyakinan segmentasi {p.confidence}</span></div>
-                {officer && selVer.state === "PUBLISHED" && <button className="btn sm" disabled={busy} onClick={() => extract(p.provision_version_id)}>Ekstrak kewajiban</button>}</div>
-              {/* Teks pasal rata kanan-kiri; lang="id" agar pemenggalan kata mengikuti bahasa Indonesia */}
-              <div className="verbatim justify" lang="id">{p.text}</div>
-            </li>)}</ul>
+            {/* [11e] setiap pasal ditampilkan lewat komponen ProvItem (lihat di bawah) */}
+            <ul className="list">{g.pasal.map(p => <ProvItem key={p.provision_version_id} p={p} draft={draft} analyst={analyst}
+              canExtract={officer && selVer.state === "PUBLISHED"} busy={busy} run={run} extract={extract} onSaved={loadProvs} />)}</ul>
           </details>) : <Empty>Versi ini belum memiliki pasal.</Empty>}
         </section> : <Empty>Pilih versi dokumen di samping untuk membaca pasalnya.</Empty>}
       </div>
@@ -95,6 +106,46 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
 
 // Tipe fungsi run() dari useAction: menjalankan aksi API lalu menampilkan pesan sukses/gagal
 type Run = (fn: () => Promise<unknown>, okText?: string) => Promise<boolean>;
+
+/** [11f] KOMPONEN BARU. Satu pasal: label OCR, tombol Konfirmasi teks / Koreksi teks (hanya Analis, hanya versi draf),
+ *  dan tombol Ekstrak kewajiban (hanya Officer, hanya versi terbit). */
+function ProvItem({ p, draft, analyst, canExtract, busy, run, extract, onSaved }: {
+  p: Prov; draft: boolean; analyst: boolean; canExtract: boolean; busy: boolean; run: Run; extract: (pv: string) => void; onSaved: () => void }) {
+  // edit = kotak koreksi sedang terbuka; text = isi kotak koreksi
+  const [edit, setEdit] = useState(false), [text, setText] = useState(p.text);
+  // Simpan koreksi: PATCH teks baru → bila berhasil, tutup kotak & muat ulang daftar pasal
+  const save = async () => {
+    if (await run(() => api(`/corpus/provision-versions/${p.provision_version_id}`, { method: "PATCH", body: { text } }),
+      `${p.number_label} dikoreksi; tercatat di jejak audit.`)) { setEdit(false); onSaved(); }
+  };
+  // Konfirmasi teks: teks OCR sudah benar → hapus tanda OCR tanpa mengubah teks
+  const confirm = async () => {
+    if (await run(() => api(`/corpus/provision-versions/${p.provision_version_id}/confirm-text`, { method: "POST" }),
+      `${p.number_label}: teks dikonfirmasi sesuai PDF.`)) onSaved();
+  };
+  return <li>
+    <div className="between">
+      {/* judul pasal + badge status teks */}
+      <div><b style={{ fontFamily: "var(--serif)", fontSize: 17 }}>{p.number_label}</b> <span className="small muted">keyakinan segmentasi {p.confidence}</span>
+        {p.low_confidence_text && <span className="badge amber" style={{ marginLeft: 6 }}>Teks OCR · perlu konfirmasi</span>}
+        {p.corrected_by_human && !p.low_confidence_text && <span className="badge" style={{ marginLeft: 6 }}>Diperiksa analis</span>}</div>
+      {/* tombol aksi: Ekstrak (Officer, versi terbit) · Koreksi & Konfirmasi (Analis, versi draf) */}
+      <span className="row">
+        {canExtract && <button className="btn sm" disabled={busy} onClick={() => extract(p.provision_version_id)}>Ekstrak kewajiban</button>}
+        {draft && analyst && !edit && <button className="btn sm ghost" onClick={() => { setText(p.text); setEdit(true); }}>Koreksi teks</button>}
+        {draft && analyst && p.low_confidence_text && !edit && <button className="btn sm" disabled={busy} onClick={confirm}>Konfirmasi teks</button>}
+      </span>
+    </div>
+    {/* mode koreksi: kotak teks + Simpan/Batal; mode baca: teks pasal rata kanan-kiri */}
+    {edit ? <div className="form" style={{ marginTop: 8 }}>
+      <textarea rows={Math.min(14, Math.max(4, text.split("\n").length + 1))} value={text} onChange={e => setText(e.target.value)} />
+      <div className="row">
+        <button className="btn primary sm" disabled={busy || !text.trim()} onClick={save}>Simpan koreksi</button>
+        <button className="btn sm ghost" onClick={() => setEdit(false)}>Batal</button>
+      </div>
+    </div> : <div className="verbatim justify" lang="id">{p.text}</div>}
+  </li>;
+}
 
 /** Hapus versi draf / dokumen yang belum pernah terbit; tarik (bukan hapus) versi yang sudah terbit.
  *  Konfirmasi dua langkah di dalam halaman agar tidak terhapus karena salah klik. */

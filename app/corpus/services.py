@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from dataclasses import dataclass, field  # [5a] untuk class Extraction (wadah hasil ekstraksi)
 from datetime import date
 
 import pymupdf  # PyMuPDF
@@ -16,7 +17,65 @@ from app.shared.schemas import (CitationResolveResponse, DocumentDetailDTO, Docu
 from app.shared.vocabularies import ChangeType, DocumentStatus, ProvisionType, VersionState
 
 
-def extract_text(filename: str, data: bytes) -> str:
+# ---------------- [5b] OCR (FR-RKM-004) ----------------
+# Halaman dengan karakter di bawah ambang ini dianggap gambar hasil pindaian → dibaca ulang lewat OCR
+MIN_CHARS_PER_PAGE = 50
+# Coba bahasa Indonesia + Inggris dulu; bila paket bahasa "ind" tidak terpasang, pakai Inggris saja
+OCR_LANGUAGES = ("ind+eng", "eng")
+
+
+@dataclass
+class Extraction:
+    """Hasil ekstraksi: teks mentah + cara memperolehnya + halaman mana yang lewat OCR."""
+    text: str
+    method: str = "TEXT_LAYER"  # TEXT_LAYER | OCR | PLAIN_TEXT
+    ocr_pages: list[int] = field(default_factory=list)
+
+
+def _ocr_page(page) -> tuple[str, str | None]:
+    """Baca satu halaman PDF lewat Tesseract. Kembalikan (teks, pesan galat terakhir bila semua bahasa gagal)."""
+    error = None
+    for lang in OCR_LANGUAGES:  # coba "ind+eng" dulu, lalu "eng"
+        try:
+            # PyMuPDF merender halaman menjadi gambar 200 dpi lalu menyerahkannya ke Tesseract;
+            # full=True = seluruh halaman di-OCR (bukan hanya bagian gambar)
+            tp = page.get_textpage_ocr(language=lang, dpi=200, full=True)
+            # ambil teks dari hasil OCR (textpage) dengan cara yang sama seperti PDF biasa
+            return page.get_text("text", textpage=tp), None
+        except Exception as exc:  # Tesseract / paket bahasa tidak terpasang
+            error = str(exc)[:200]  # simpan pesan galat (dipotong 200 karakter) lalu coba bahasa berikutnya
+    return "", error  # semua bahasa gagal → teks kosong + alasan galat
+
+
+def _extract_pdf_pages(doc) -> Extraction:
+    """Ambil lapisan teks per halaman; halaman yang (hampir) kosong dialihkan ke OCR."""
+    pages: list[str] = []      # teks setiap halaman, urut
+    ocr_pages: list[int] = []  # nomor halaman (mulai 1) yang teksnya berasal dari OCR
+    ocr_error = None           # galat OCR terakhir (bila Tesseract bermasalah)
+    for i, page in enumerate(doc):
+        txt = page.get_text("text")  # 1) coba lapisan teks bawaan PDF (cepat & akurat)
+        if len(txt.strip()) < MIN_CHARS_PER_PAGE:  # 2) hampir kosong → kemungkinan halaman hasil scan
+            ocr_txt, err = _ocr_page(page)          # 3) baca ulang halaman sebagai gambar lewat OCR
+            ocr_error = err or ocr_error
+            if len(ocr_txt.strip()) > len(txt.strip()):  # pakai OCR hanya bila hasilnya lebih banyak
+                txt = ocr_txt
+                ocr_pages.append(i + 1)
+        pages.append(txt)
+
+    # seluruh halaman tetap kosong → tidak ada yang bisa disegmentasi, tolak dengan pesan yang jelas
+    if not any(p.strip() for p in pages):
+        raise AppError(
+            422,
+            "OCR_UNAVAILABLE" if ocr_error else "NO_TEXT",
+            "PDF tidak memiliki lapisan teks dan OCR tidak berhasil. Pastikan image api sudah dibangun ulang "
+            "(Tesseract terpasang), atau unggah versi .txt hasil transkripsi.",
+            {"detail": ocr_error} if ocr_error else None
+        )
+    # gabungkan semua halaman; metode = OCR bila minimal satu halaman dibaca lewat OCR
+    return Extraction(text="\n".join(pages), method="OCR" if ocr_pages else "TEXT_LAYER", ocr_pages=ocr_pages)
+
+
+def extract_text(filename: str, data: bytes) -> Extraction:  # [5b] sekarang mengembalikan Extraction, bukan str
     suffix = (
         filename.lower().rsplit(".", 1)[-1]
         if "." in filename else ""
@@ -54,11 +113,8 @@ def extract_text(filename: str, data: bytes) -> str:
                         "PDF dilindungi kata sandi."
                     )
 
-                # Mengekstrak teks seluruh halaman
-                return "\n".join(
-                    page.get_text("text")
-                    for page in doc
-                )
+                # [5c] Mengekstrak teks per halaman; halaman pindaian dibaca lewat OCR
+                return _extract_pdf_pages(doc)
 
         except AppError:
             raise
@@ -74,7 +130,8 @@ def extract_text(filename: str, data: bytes) -> str:
     # Membaca file TXT
     if suffix == "txt":
         try:
-            return data.decode("utf-8-sig")
+            # [5d] berkas .txt tidak perlu OCR; dibungkus Extraction agar bentuk hasilnya sama dengan PDF
+            return Extraction(text=data.decode("utf-8-sig"), method="PLAIN_TEXT")
 
         except UnicodeDecodeError as exc:
             raise AppError(
@@ -102,7 +159,8 @@ def get_or_create_source(db: Session, name: str, category: str, issuer: str, bas
 def persist_segments(
     db: Session,
     dv: DocumentVersion,
-    segments: list[Segment]
+    segments: list[Segment],
+    low_confidence: bool = False  # [5e] True bila teks berasal dari OCR → wajib dikonfirmasi analis
 ) -> int:
 
     # 1. Kelompokkan segmen berdasarkan provision_key
@@ -121,6 +179,7 @@ def persist_segments(
         if key not in grouped_segments:
             grouped_segments[key] = {
                 "number_label": seg.number_label,
+                "provision_type": seg.provision_type,  # PASAL atau PENJELASAN
                 "hierarchical_path": seg.hierarchical_path,
                 "texts": [],
                 "confidence": seg.confidence
@@ -150,7 +209,7 @@ def persist_segments(
             prov = Provision(
                 document_id=dv.document_id,
                 provision_key=key,
-                provision_type=ProvisionType.PASAL.value,
+                provision_type=item["provision_type"],
                 number_label=item["number_label"],
                 hierarchical_path=item["hierarchical_path"]
             )
@@ -171,7 +230,8 @@ def persist_segments(
                 document_version_id=dv.id,
                 sequence=seq,
                 text=combined_text,
-                segmentation_confidence=item["confidence"]
+                segmentation_confidence=item["confidence"],
+                low_confidence_text=low_confidence  # [5f] tanda OCR disimpan per pasal
             )
         )
 
@@ -182,18 +242,22 @@ def persist_segments(
 
 def ingest_version(db: Session, document: Document, filename: str, data: bytes, effective_date: date,
                    origin_url: str, object_key: str) -> tuple[DocumentVersion, int]:
-    raw = extract_text(filename, data)
-    segments = segment_text(raw)
+    # [5g] ex.text = teks mentah, ex.method = cara memperoleh, ex.ocr_pages = halaman OCR
+    ex = extract_text(filename, data)
+    segments = segment_text(ex.text)  # pecah teks menjadi pasal-pasal
     if not segments:
         raise AppError(422, "NO_PROVISIONS_FOUND", "Tidak ada Pasal terdeteksi pada dokumen")
     next_no = (db.scalar(select(func.max(DocumentVersion.version_number))
                          .where(DocumentVersion.document_id == document.id)) or 0) + 1
     dv = DocumentVersion(document_id=document.id, version_number=next_no, sha256=hashlib.sha256(data).hexdigest(),
                          origin_url=origin_url, canonical_text_ref=object_key, effective_date=effective_date,
-                         state=VersionState.PARSING.value)
+                         state=VersionState.PARSING.value,
+                         extraction_method=ex.method,  # [5g] disimpan agar UI & auditor tahu teks ini dari OCR atau bukan
+                         ocr_pages=ex.ocr_pages)
     db.add(dv)
     db.flush()
-    n = persist_segments(db, dv, segments)
+    # [5g] bila ada halaman OCR, semua pasal versi ini ditandai "perlu konfirmasi analis"
+    n = persist_segments(db, dv, segments, low_confidence=bool(ex.ocr_pages))
     dv.state = VersionState.SEGMENTED_DRAFT.value
     return dv, n
 
@@ -201,6 +265,14 @@ def ingest_version(db: Session, document: Document, filename: str, data: bytes, 
 def publish_version(db: Session, dv: DocumentVersion) -> None:
     if dv.state not in (VersionState.SEGMENTED_DRAFT.value, VersionState.UNDER_CORRECTION.value):
         raise AppError(409, "INVALID_STATE", f"Versi berstatus {dv.state} tidak dapat dipublikasikan")
+    # [5h] FR-RKM-004: teks hasil OCR wajib dikonfirmasi/dikoreksi analis sebelum versi dibekukan
+    # hitung pasal versi ini yang masih bertanda low_confidence_text = true
+    pending = db.scalar(select(func.count()).select_from(ProvisionVersion).where(
+        ProvisionVersion.document_version_id == dv.id, ProvisionVersion.low_confidence_text.is_(True)))
+    if pending:  # masih ada yang belum diperiksa → tolak publikasi (409) dan sebutkan jumlahnya
+        raise AppError(409, "LOW_CONFIDENCE_UNCONFIRMED",
+                       f"{pending} pasal hasil OCR belum dikonfirmasi; klik Konfirmasi teks atau Koreksi teks dulu",
+                       {"pending": pending})
     dv.state = VersionState.PUBLISHED.value
     doc = db.get(Document, dv.document_id)
     doc.status = DocumentStatus.IN_FORCE.value

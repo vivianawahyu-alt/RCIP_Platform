@@ -1,0 +1,39 @@
+{
+  "effective_date": "2024-06-05",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "c715b2b9-c40c-4d91-86fd-e062a33dc7af",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 2",
+      "id": "b6aae05b-13d5-42f7-b09b-7d97464c04af",
+      "low_confidence_text": false,
+      "number_label": "Pasal 2",
+      "provision_key": "PASAL-2",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib menyampaikan laporan kegiatan penukaran valuta asing kepada Bank Indonesia setiap bulan paling lambat tanggal 10 (sepuluh) bulan berikutnya."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 6",
+      "id": "14a0bccb-8a47-4a87-a49d-681d51d87c64",
+      "low_confidence_text": false,
+      "number_label": "Pasal 6",
+      "provision_key": "PASAL-6",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib menatausahakan bukti transaksi penukaran valuta asing paling singkat 5 (lima) tahun."
+    }
+  ],
+  "sha256": "bed0778eac4d5202bc4ac3fc7c8486b35ffe6e981165f85cf3df2ad57c618e1b",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/padg_s-11_2022/v1",
+  "updated_at": "2024-06-03T10:09:00.000000+00:00"
+}

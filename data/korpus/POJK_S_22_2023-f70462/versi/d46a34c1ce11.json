@@ -1,0 +1,87 @@
+{
+  "effective_date": "2026-09-04",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "3ae8cc93-8dcd-4d03-969b-666205628059",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 2",
+      "id": "122c9a56-01d7-4256-b860-2ab696a402f2",
+      "low_confidence_text": false,
+      "number_label": "Pasal 2",
+      "provision_key": "PASAL-2",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Konsumen adalah setiap orang yang memiliki dan/atau memanfaatkan produk dan/atau layanan yang disediakan oleh Pelaku Usaha Jasa Keuangan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 19",
+      "id": "3a9bedd4-0f12-49e0-a18f-f6b6b535106e",
+      "low_confidence_text": false,
+      "number_label": "Pasal 19",
+      "provision_key": "PASAL-19",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Pelaku Usaha Jasa Keuangan wajib menyampaikan ringkasan informasi produk dan layanan kepada calon Konsumen sebelum perjanjian ditandatangani."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 33",
+      "id": "dc1110c1-080a-4dfb-a7c9-9b26114125c6",
+      "low_confidence_text": false,
+      "number_label": "Pasal 33",
+      "provision_key": "PASAL-33",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Pelaku Usaha Jasa Keuangan wajib menindaklanjuti pengaduan Konsumen paling lama 10 (sepuluh) hari kerja setelah pengaduan diterima."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 40",
+      "id": "3ceddf2d-839f-4c50-9223-b5135496f63c",
+      "low_confidence_text": false,
+      "number_label": "Pasal 40",
+      "provision_key": "PASAL-40",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 4,
+      "text": "Pelaku Usaha Jasa Keuangan dapat memperpanjang jangka waktu penanganan pengaduan dalam kondisi tertentu."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 44",
+      "id": "36d8393a-7c44-4fe7-ab42-20a7474a493b",
+      "low_confidence_text": false,
+      "number_label": "Pasal 44",
+      "provision_key": "PASAL-44",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 5,
+      "text": "Pelaku Usaha Jasa Keuangan wajib menyampaikan laporan penanganan pengaduan kepada Otoritas Jasa Keuangan setiap triwulan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 50",
+      "id": "7900f7f9-9382-4b43-922f-e15ae1e3db63",
+      "low_confidence_text": false,
+      "number_label": "Pasal 50",
+      "provision_key": "PASAL-50",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 6,
+      "text": "Pelaku Usaha Jasa Keuangan wajib menyediakan layanan pengaduan yang dapat diakses penyandang disabilitas."
+    }
+  ],
+  "sha256": "d46a34c1ce114b1da0e7947c9afc0cabba606c68f9a593eee4b14ba84005ab0d",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/konsumen/v2",
+  "updated_at": "2026-09-02T11:50:00.000000+00:00"
+}

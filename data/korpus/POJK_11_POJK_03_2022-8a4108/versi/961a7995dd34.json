@@ -1,0 +1,75 @@
+{
+  "effective_date": "2026-01-08",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "aefcfad8-efc8-4849-b3aa-7efe4458a885",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 1",
+      "id": "a28defe3-9bf0-4273-9247-6f57a5e5a5ab",
+      "low_confidence_text": false,
+      "number_label": "Pasal 1",
+      "provision_key": "PASAL-1",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Dalam Peraturan ini yang dimaksud dengan Bank adalah bank umum konvensional."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 5",
+      "id": "3eabedcb-baa8-4dd4-88bd-64072bcfbe01",
+      "low_confidence_text": false,
+      "number_label": "Pasal 5",
+      "provision_key": "PASAL-5",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib memiliki kebijakan keamanan siber yang disetujui direksi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 20",
+      "id": "451b4cf3-6123-4df7-b656-af7229d4beef",
+      "low_confidence_text": false,
+      "number_label": "Pasal 20",
+      "provision_key": "PASAL-20",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank wajib melakukan pengujian pemulihan bencana paling sedikit 1 (satu) kali dalam 1 (satu) tahun."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 60",
+      "id": "b02b61c4-a3d7-4628-ace6-6fa2fd5166e6",
+      "low_confidence_text": false,
+      "number_label": "Pasal 60",
+      "provision_key": "PASAL-60",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 4,
+      "text": "Bank wajib menyampaikan laporan insiden TI kepada Otoritas Jasa Keuangan paling lambat 12 (dua belas) jam setelah insiden TI diketahui."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 61",
+      "id": "0e51f30d-c6a7-4e39-84b0-32ccd7c524a5",
+      "low_confidence_text": false,
+      "number_label": "Pasal 61",
+      "provision_key": "PASAL-61",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 5,
+      "text": "Bank wajib menyimpan bukti pelaporan insiden TI paling singkat 5 (lima) tahun."
+    }
+  ],
+  "sha256": "961a7995dd3471d44e0b9598a38b77b416c49c24ab937884e31a1319f93e9126",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/ti/v2",
+  "updated_at": "2026-01-06T11:52:00.000000+00:00"
+}

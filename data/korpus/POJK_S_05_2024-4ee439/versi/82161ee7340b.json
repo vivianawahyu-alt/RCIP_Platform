@@ -1,0 +1,39 @@
+{
+  "effective_date": "2026-04-17",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "35c7936c-5b99-42c6-a61f-ecc00a368ce7",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 3",
+      "id": "e256a6dc-8f54-46b7-87b5-b2bc5a8aaeca",
+      "low_confidence_text": false,
+      "number_label": "Pasal 3",
+      "provision_key": "PASAL-3",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "BPR wajib memiliki paling sedikit 2 (dua) anggota Direksi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 8",
+      "id": "ee0caeb5-ecfe-4b99-a790-cebdbfddc3d9",
+      "low_confidence_text": false,
+      "number_label": "Pasal 8",
+      "provision_key": "PASAL-8",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "BPR wajib menyampaikan laporan tata kelola setiap tahun."
+    }
+  ],
+  "sha256": "82161ee7340ba9ec9785163fac2ae114d4da1d0a5ea244e6a7adf0eef2eb5244",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/bpr/v1",
+  "updated_at": "2026-04-15T11:55:00.000000+00:00"
+}

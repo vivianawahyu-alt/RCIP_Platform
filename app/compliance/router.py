@@ -97,6 +97,10 @@ def extract(body: ExtractIn, db: Session = Depends(get_db), user: AppUser = Depe
     dv = db.get(DocumentVersion, pv.document_version_id)
     if dv.state != "PUBLISHED":
         raise AppError(409, "VERSION_NOT_PUBLISHED", "Ekstraksi hanya untuk versi yang sudah terbit")
+    # [7] FR-RKM-004 lapis kedua: AI tidak boleh menyusun kewajiban dari teks OCR yang belum diperiksa
+    # (normalnya tidak terjadi karena publikasi sudah diblokir; ini pengaman tambahan)
+    if pv.low_confidence_text:
+        raise AppError(422, "LOW_CONFIDENCE_TEXT_BLOCKED", "Teks pasal hasil OCR belum dikonfirmasi analis")
     from app.compliance.applicability import _profile, approved_decision_for
     profile = _profile(db, body.profile_id)
     decision = approved_decision_for(db, dv.id, profile.id)

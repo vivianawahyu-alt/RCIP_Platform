@@ -1,0 +1,51 @@
+{
+  "effective_date": "2024-08-18",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "f3b63fe1-d184-4324-97e8-392a55cee5db",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 1",
+      "id": "25b8fd4b-32fa-4de8-8e7a-e7f639820cff",
+      "low_confidence_text": false,
+      "number_label": "Pasal 1",
+      "provision_key": "PASAL-1",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Sistem Pembayaran adalah sistem yang mencakup seperangkat aturan, lembaga, mekanisme, infrastruktur, sumber dana untuk pembayaran, dan akses ke sumber dana untuk pembayaran."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 9",
+      "id": "c4bbb7a9-d988-48dd-9c7c-737779a28903",
+      "low_confidence_text": false,
+      "number_label": "Pasal 9",
+      "provision_key": "PASAL-9",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyelenggara Sistem Pembayaran wajib memperoleh izin dari Bank Indonesia sebelum melakukan kegiatan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 15",
+      "id": "b7e58481-31c6-41ec-935f-2b0aa1384ddc",
+      "low_confidence_text": false,
+      "number_label": "Pasal 15",
+      "provision_key": "PASAL-15",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Penyelenggara Sistem Pembayaran wajib menyampaikan laporan insiden operasional kepada Bank Indonesia paling lambat 1 (satu) jam setelah insiden diketahui."
+    }
+  ],
+  "sha256": "89023015217ad6c6f2300cfba8b313a4dbbfcfb4a9cde1f7a9d332777119f25f",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pbi_s-22_2020/v1",
+  "updated_at": "2024-08-16T14:31:00.000000+00:00"
+}

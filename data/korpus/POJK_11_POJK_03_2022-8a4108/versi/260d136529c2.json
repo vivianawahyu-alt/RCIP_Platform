@@ -1,0 +1,63 @@
+{
+  "effective_date": "2022-10-15",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "759cde66-bacf-43d0-8b1f-9163ce9ff57f",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 1",
+      "id": "4b0dbb41-8d52-48f1-942c-3fe860e7a113",
+      "low_confidence_text": false,
+      "number_label": "Pasal 1",
+      "provision_key": "PASAL-1",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Dalam Peraturan ini yang dimaksud dengan Bank adalah bank umum konvensional."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 5",
+      "id": "3139d32c-93cd-49bf-9c94-1cf0dc98d2c1",
+      "low_confidence_text": false,
+      "number_label": "Pasal 5",
+      "provision_key": "PASAL-5",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib memiliki kebijakan keamanan siber yang disetujui direksi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 20",
+      "id": "fc377a4c-4a15-444d-85e7-ce8a3a578a8e",
+      "low_confidence_text": false,
+      "number_label": "Pasal 20",
+      "provision_key": "PASAL-20",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank wajib melakukan pengujian pemulihan bencana paling sedikit 1 (satu) kali dalam 1 (satu) tahun."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 60",
+      "id": "7412b293-4729-4739-a14f-f3d719db3ad0",
+      "low_confidence_text": false,
+      "number_label": "Pasal 60",
+      "provision_key": "PASAL-60",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 4,
+      "text": "Bank wajib menyampaikan laporan insiden TI kepada Otoritas Jasa Keuangan paling lambat 24 (dua puluh empat) jam setelah insiden TI diketahui."
+    }
+  ],
+  "sha256": "260d136529c2dc9ec1b20b061800c6dc0e29a7b4044b88c38e946514c561d230",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/ti/v1",
+  "updated_at": "2022-10-13T13:10:00.000000+00:00"
+}

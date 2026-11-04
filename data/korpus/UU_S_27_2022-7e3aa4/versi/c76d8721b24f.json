@@ -1,0 +1,51 @@
+{
+  "effective_date": "2024-02-07",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "c991603f-28c1-4091-844d-610b3f87e362",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 20",
+      "id": "38f16a81-787f-4425-9bcc-c47709e9db0a",
+      "low_confidence_text": false,
+      "number_label": "Pasal 20",
+      "provision_key": "PASAL-20",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Pengendali Data Pribadi wajib memiliki dasar pemrosesan Data Pribadi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 46",
+      "id": "cb9bc326-d20e-4c17-8e20-fd1a598336e3",
+      "low_confidence_text": false,
+      "number_label": "Pasal 46",
+      "provision_key": "PASAL-46",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Pengendali Data Pribadi wajib menyampaikan pemberitahuan tertulis paling lambat 3 x 24 (tiga kali dua puluh empat) jam apabila terjadi kegagalan Pelindungan Data Pribadi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 53",
+      "id": "5408f9ac-6601-4dd0-b170-f437a8f7ef5a",
+      "low_confidence_text": false,
+      "number_label": "Pasal 53",
+      "provision_key": "PASAL-53",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Pengendali Data Pribadi wajib menunjuk pejabat yang melaksanakan fungsi Pelindungan Data Pribadi dalam hal pemrosesan dilakukan dalam skala besar."
+    }
+  ],
+  "sha256": "c76d8721b24f443d5a19ba1add793ecc444496d1e2a0dec6fbdfc62a440dbf95",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pdp/v1",
+  "updated_at": "2024-02-05T12:55:00.000000+00:00"
+}

@@ -1,0 +1,51 @@
+{
+  "effective_date": "2022-10-22",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "49bc473f-ed7b-4656-a18a-15368c99a894",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 4",
+      "id": "a14923c2-f920-464c-8763-fcd01f15c7b6",
+      "low_confidence_text": false,
+      "number_label": "Pasal 4",
+      "provision_key": "PASAL-4",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib menyusun rencana bisnis yang realistis dan disetujui Dewan Komisaris."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 17",
+      "id": "03802b70-8d03-491e-8f8d-5238288b78b5",
+      "low_confidence_text": false,
+      "number_label": "Pasal 17",
+      "provision_key": "PASAL-17",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib menyampaikan rencana bisnis kepada Otoritas Jasa Keuangan paling lambat akhir bulan November."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 21",
+      "id": "1d0bc9bd-e9b5-45cf-9766-5cdafe049059",
+      "low_confidence_text": false,
+      "number_label": "Pasal 21",
+      "provision_key": "PASAL-21",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank wajib menyampaikan laporan realisasi rencana bisnis setiap semester."
+    }
+  ],
+  "sha256": "309267bc3446aa485c96d9042d2fb48194878db99351b3cb13063bfaf01b113b",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pojk_s-05_2016/v1",
+  "updated_at": "2022-10-20T15:07:00.000000+00:00"
+}

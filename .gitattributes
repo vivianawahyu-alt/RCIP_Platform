@@ -1,0 +1,3 @@
+# Berkas korpus tim disimpan apa adanya (tanpa konversi akhir baris CRLF/LF oleh Git di Windows),
+# agar berkas .txt asli tetap identik byte-per-byte dengan sidik jari sha256-nya.
+data/korpus/** -text

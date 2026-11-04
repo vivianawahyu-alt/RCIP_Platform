@@ -1,0 +1,34 @@
+{
+  "canonical_number": "POJK S-09/2016",
+  "created_at": "2018-08-15T17:26:00.000000+00:00",
+  "deleted_at": null,
+  "format": 2,
+  "id": "f071d879-54c6-4cd8-8945-6f27d7fa2d8d",
+  "instrument_type": "POJK",
+  "issuer": "Otoritas Jasa Keuangan",
+  "labels": [
+    {
+      "dimension": "POPULATION",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "SUGGESTED",
+      "value": "Bank umum"
+    },
+    {
+      "dimension": "THEME",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "CONFIRMED",
+      "value": "Manajemen risiko"
+    }
+  ],
+  "source": {
+    "base_url": "https://www.ojk.go.id",
+    "category": "OJK",
+    "issuer_name": "Otoritas Jasa Keuangan",
+    "name": "OJK",
+    "permitted_use_statement": null,
+    "status": "ACTIVE"
+  },
+  "title_id": "Prinsip Kehati-hatian dalam Alih Daya oleh Bank Umum"
+}

@@ -154,6 +154,8 @@ textarea { min-height: 84px; resize: vertical; }
 .notice { padding: 11px 14px; border-radius: 9px; margin-bottom: 16px; font-size: 14px; border: 1px solid; display: flex; justify-content: space-between; gap: 12px; }
 .notice.error { background: var(--red-soft); color: #7a1a12; border-color: #f5c2bc; }
 .notice.ok { background: var(--green-soft); color: #05502f; border-color: #b7e3cb; }
+/* [10] Peringatan teks OCR yang belum dikonfirmasi analis (kotak kuning di atas daftar pasal) */
+.notice.warn { background: var(--amber-soft); color: #6b3d00; border-color: #f8d7a8; }
 .notice button { background: none; border: 0; color: inherit; text-decoration: underline; padding: 0; }
 .empty { border: 1px dashed #c9d0db; border-radius: 10px; padding: 22px; text-align: center; color: var(--muted); background: var(--paper); }
 

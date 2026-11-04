@@ -1,0 +1,27 @@
+{
+  "effective_date": "2018-08-17",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "f86c2ca2-e085-46db-9d87-09660710d430",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 6",
+      "id": "1bc044fc-09cb-4942-83f5-9a85fbc9f87a",
+      "low_confidence_text": false,
+      "number_label": "Pasal 6",
+      "provision_key": "PASAL-6",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib melaporkan rencana alih daya kepada Otoritas Jasa Keuangan paling lambat 60 (enam puluh) hari sebelum perjanjian ditandatangani."
+    }
+  ],
+  "sha256": "993deed8ff0f502c8cd47ef8b3622a668235ea6f88a7737973746bed162480ba",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/alihdaya_lama/v1",
+  "updated_at": "2018-08-15T17:27:00.000000+00:00"
+}

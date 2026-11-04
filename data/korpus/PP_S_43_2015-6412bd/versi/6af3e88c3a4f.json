@@ -1,0 +1,39 @@
+{
+  "effective_date": "2023-08-14",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "ff233d5f-6ced-415d-9800-7c0287ea7ff5",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 2",
+      "id": "4e7ed827-455a-4762-b428-a656b3ee4d3b",
+      "low_confidence_text": false,
+      "number_label": "Pasal 2",
+      "provision_key": "PASAL-2",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Pihak Pelapor meliputi penyedia jasa keuangan dan penyedia barang dan/atau jasa lain."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 8",
+      "id": "be2d740a-1e9b-43bc-90c7-c006314d3441",
+      "low_confidence_text": false,
+      "number_label": "Pasal 8",
+      "provision_key": "PASAL-8",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Pihak Pelapor wajib menyampaikan laporan kepada PPATK sesuai bentuk dan tata cara yang ditetapkan."
+    }
+  ],
+  "sha256": "6af3e88c3a4f0618e217ce16b25eb2eea4f2c350ad1dbb57dcb0ff978252a434",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pp_s-43_2015/v1",
+  "updated_at": "2023-08-12T16:48:00.000000+00:00"
+}

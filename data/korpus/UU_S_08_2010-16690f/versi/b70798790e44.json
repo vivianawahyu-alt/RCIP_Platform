@@ -1,0 +1,51 @@
+{
+  "effective_date": "2023-09-20",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "5ad5cf06-364d-4c87-bcd0-129d2e8d0e87",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 18",
+      "id": "e14eb70d-b380-473a-989d-9d4ae15ca666",
+      "low_confidence_text": false,
+      "number_label": "Pasal 18",
+      "provision_key": "PASAL-18",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Pihak Pelapor wajib menerapkan prinsip mengenali Pengguna Jasa."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 23",
+      "id": "3dc98290-15ea-4b27-b0e9-12f2f2b43abf",
+      "low_confidence_text": false,
+      "number_label": "Pasal 23",
+      "provision_key": "PASAL-23",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyedia jasa keuangan wajib menyampaikan laporan transaksi keuangan tunai dalam jumlah paling sedikit Rp500.000.000,00 kepada PPATK paling lambat 14 (empat belas) hari kerja."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 29",
+      "id": "79e13cea-b0cb-461f-bd85-de89c2171429",
+      "low_confidence_text": false,
+      "number_label": "Pasal 29",
+      "provision_key": "PASAL-29",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Pihak Pelapor dapat menolak transaksi dengan Pengguna Jasa yang tidak memenuhi ketentuan identifikasi."
+    }
+  ],
+  "sha256": "b70798790e4457cb088a2be64cfda255a5880d153d0298cead3cb0eeb4e6ecdd",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/uu_s-08_2010/v1",
+  "updated_at": "2023-09-18T15:28:00.000000+00:00"
+}

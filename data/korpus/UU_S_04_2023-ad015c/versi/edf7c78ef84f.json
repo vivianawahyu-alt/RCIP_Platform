@@ -1,0 +1,51 @@
+{
+  "effective_date": "2023-12-03",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "99b49350-af2b-49b4-99ac-d1584d3485c5",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 6",
+      "id": "58e25888-0a83-41be-885a-ca4690e0f4a0",
+      "low_confidence_text": false,
+      "number_label": "Pasal 6",
+      "provision_key": "PASAL-6",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Lembaga Jasa Keuangan wajib menerapkan prinsip tata kelola yang baik dan manajemen risiko yang memadai."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 231",
+      "id": "575aed2c-a5c5-450c-8186-a57611a72609",
+      "low_confidence_text": false,
+      "number_label": "Pasal 231",
+      "provision_key": "PASAL-231",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Lembaga Jasa Keuangan wajib menyediakan unit pelaksana fungsi kepatuhan yang independen."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 245",
+      "id": "f5f62c97-6efb-43b1-9b04-98637d7ddbed",
+      "low_confidence_text": false,
+      "number_label": "Pasal 245",
+      "provision_key": "PASAL-245",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Lembaga Jasa Keuangan dilarang memberikan informasi yang menyesatkan kepada konsumen."
+    }
+  ],
+  "sha256": "edf7c78ef84fc22c0bfea12f6266443a6685c7c9a910cad8ba4bd88ff9378a8d",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/uu_s-04_2023/v1",
+  "updated_at": "2023-12-01T13:40:00.000000+00:00"
+}

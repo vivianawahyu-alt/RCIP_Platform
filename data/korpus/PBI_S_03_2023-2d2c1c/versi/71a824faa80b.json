@@ -1,0 +1,39 @@
+{
+  "effective_date": "2024-02-15",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "78660765-14f7-4e8d-95bc-b8d04094dded",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 8",
+      "id": "39669fa7-5997-4043-b3b1-025bfff9f585",
+      "low_confidence_text": false,
+      "number_label": "Pasal 8",
+      "provision_key": "PASAL-8",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Penyelenggara wajib menyediakan layanan pengaduan konsumen yang dapat diakses setiap hari kerja."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 14",
+      "id": "07f194f9-c115-4d6d-8a4e-5b70a6d964a3",
+      "low_confidence_text": false,
+      "number_label": "Pasal 14",
+      "provision_key": "PASAL-14",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyelenggara wajib menyelesaikan pengaduan konsumen paling lama 20 (dua puluh) hari kerja setelah pengaduan diterima secara lengkap."
+    }
+  ],
+  "sha256": "71a824faa80bb6a584f9389dd297c0c513ea51b86b4e4d86798d6513c20af84d",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pbi_s-03_2023/v1",
+  "updated_at": "2024-02-13T11:12:00.000000+00:00"
+}

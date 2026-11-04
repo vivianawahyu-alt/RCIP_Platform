@@ -1,0 +1,39 @@
+{
+  "effective_date": "2023-06-01",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "5738811d-70c2-403f-ba8d-03aa782a65e0",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 13",
+      "id": "1d34d08e-7a4c-45d4-9c99-e04cf0e98b3b",
+      "low_confidence_text": false,
+      "number_label": "Pasal 13",
+      "provision_key": "PASAL-13",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Pelaku Usaha wajib menyampaikan informasi yang lengkap dan benar mengenai barang yang ditawarkan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 27",
+      "id": "afbb411a-a123-4a8c-93b7-a88612f70c97",
+      "low_confidence_text": false,
+      "number_label": "Pasal 27",
+      "provision_key": "PASAL-27",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Pelaku Usaha wajib menyimpan data transaksi paling singkat 10 (sepuluh) tahun."
+    }
+  ],
+  "sha256": "82df98e5206f420e5aba2648581a6c699f63cba0ffd71986508772e9af641a70",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pp_s-80_2019/v1",
+  "updated_at": "2023-05-30T08:09:00.000000+00:00"
+}

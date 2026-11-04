@@ -1,0 +1,87 @@
+{
+  "effective_date": "2024-11-13",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "23bed01d-43cf-4fde-a493-3b83757750a9",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 1",
+      "id": "6dadd6c7-95a7-4d79-bf3c-4c06434308bc",
+      "low_confidence_text": false,
+      "number_label": "Pasal 1",
+      "provision_key": "PASAL-1",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Dalam Peraturan ini yang dimaksud dengan Penyedia Jasa Keuangan adalah lembaga jasa keuangan yang diawasi Otoritas Jasa Keuangan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 4",
+      "id": "2369b584-ff5e-4ff0-bf50-bde4382567b8",
+      "low_confidence_text": false,
+      "number_label": "Pasal 4",
+      "provision_key": "PASAL-4",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyedia Jasa Keuangan wajib melakukan identifikasi dan verifikasi calon nasabah sebelum membangun hubungan usaha."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 12",
+      "id": "27209bdf-1c11-4735-9c71-3d960c0fd195",
+      "low_confidence_text": false,
+      "number_label": "Pasal 12",
+      "provision_key": "PASAL-12",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Penyedia Jasa Keuangan wajib menyampaikan laporan transaksi keuangan mencurigakan kepada PPATK paling lambat 3 (tiga) hari kerja setelah transaksi diketahui."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 15",
+      "id": "62801c45-1043-4a10-98ae-43346c12ace8",
+      "low_confidence_text": false,
+      "number_label": "Pasal 15",
+      "provision_key": "PASAL-15",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 4,
+      "text": "Penyedia Jasa Keuangan wajib melakukan pengkinian data nasabah berisiko tinggi paling sedikit 1 (satu) kali dalam 1 (satu) tahun."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 21",
+      "id": "8da0365b-f898-47b9-805c-acec877409a9",
+      "low_confidence_text": false,
+      "number_label": "Pasal 21",
+      "provision_key": "PASAL-21",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 5,
+      "text": "Penyedia Jasa Keuangan dilarang membuka rekening anonim atau rekening yang menggunakan nama fiktif."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 30",
+      "id": "e2817efd-ae84-4217-9d53-434bb88139b9",
+      "low_confidence_text": false,
+      "number_label": "Pasal 30",
+      "provision_key": "PASAL-30",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 6,
+      "text": "Penyedia Jasa Keuangan wajib menatausahakan dokumen nasabah paling singkat 5 (lima) tahun sejak berakhirnya hubungan usaha."
+    }
+  ],
+  "sha256": "aeaefd989c69679e854c0f83df367c1c1cf26760fc4cd9e3634334f632d9af11",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/apu/v1",
+  "updated_at": "2024-11-11T16:48:00.000000+00:00"
+}

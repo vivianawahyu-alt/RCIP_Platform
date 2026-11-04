@@ -1,0 +1,51 @@
+{
+  "effective_date": "2024-04-29",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "05000bc6-b20d-4b6e-b231-1f1795863a76",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 1",
+      "id": "f1578470-0182-47c4-ba1b-58066160a6b4",
+      "low_confidence_text": false,
+      "number_label": "Pasal 1",
+      "provision_key": "PASAL-1",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Giro Wajib Minimum adalah jumlah dana minimum yang wajib dipelihara oleh Bank dalam rekening giro di Bank Indonesia."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 4",
+      "id": "d5f25073-f414-42b1-a442-9ebbda7b9095",
+      "low_confidence_text": false,
+      "number_label": "Pasal 4",
+      "provision_key": "PASAL-4",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib memenuhi Giro Wajib Minimum dalam Rupiah sebesar 9% (sembilan persen) dari dana pihak ketiga dalam Rupiah."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 11",
+      "id": "e5d6f6e6-9a6e-42f5-8cc4-29038bcf53a1",
+      "low_confidence_text": false,
+      "number_label": "Pasal 11",
+      "provision_key": "PASAL-11",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank wajib membayar sanksi kewajiban membayar apabila tidak memenuhi Giro Wajib Minimum paling lambat 5 (lima) hari kerja setelah surat pemberitahuan diterima."
+    }
+  ],
+  "sha256": "a7c65814ce79a005a8f6909224f5f8aef05ed9cc55f596df96c2c9fd2b994802",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pbi_s-07_2024/v1",
+  "updated_at": "2024-04-27T11:31:00.000000+00:00"
+}

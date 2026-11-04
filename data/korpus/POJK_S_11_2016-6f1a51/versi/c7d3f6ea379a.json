@@ -1,0 +1,39 @@
+{
+  "effective_date": "2023-02-10",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "4ebfa5c3-cae9-44a7-aa79-ea680f44704f",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 2",
+      "id": "1fd5a423-706c-4c56-89e2-623debd34616",
+      "low_confidence_text": false,
+      "number_label": "Pasal 2",
+      "provision_key": "PASAL-2",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib menyediakan modal minimum sesuai profil risiko paling rendah 8% (delapan persen) dari aset tertimbang menurut risiko."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 40",
+      "id": "801ef1da-45b1-4d25-b153-3ae8670acc5c",
+      "low_confidence_text": false,
+      "number_label": "Pasal 40",
+      "provision_key": "PASAL-40",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib menyampaikan laporan perhitungan kewajiban penyediaan modal minimum setiap bulan."
+    }
+  ],
+  "sha256": "c7d3f6ea379a7911c93c61380ad8457982a0c40c5c03180a405072504ca04aaa",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pojk_s-11_2016/v1",
+  "updated_at": "2023-02-08T16:31:00.000000+00:00"
+}

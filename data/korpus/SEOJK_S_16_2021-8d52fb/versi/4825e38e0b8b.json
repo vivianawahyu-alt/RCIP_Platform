@@ -1,0 +1,27 @@
+{
+  "effective_date": "2023-07-22",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "6e0d2648-35ce-4841-8973-2d6c4dcabfb7",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 2",
+      "id": "71316269-7118-4364-b709-7749527eecfa",
+      "low_confidence_text": false,
+      "number_label": "Pasal 2",
+      "provision_key": "PASAL-2",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Emiten wajib menyampaikan laporan tahunan kepada Otoritas Jasa Keuangan paling lambat akhir bulan keempat setelah tahun buku berakhir."
+    }
+  ],
+  "sha256": "4825e38e0b8b40eeac65efd397cdeb054122dc01a430453af7de1ca704e00a4b",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/keberlanjutan/v1",
+  "updated_at": "2023-07-20T11:32:00.000000+00:00"
+}

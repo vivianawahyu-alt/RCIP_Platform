@@ -1,0 +1,63 @@
+{
+  "effective_date": "2026-10-24",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "286218b8-48f4-4f12-9e99-53d23e896c64",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 5",
+      "id": "b41b3143-8b10-450c-9570-4f32702cdd20",
+      "low_confidence_text": false,
+      "number_label": "Pasal 5",
+      "provision_key": "PASAL-5",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib menerapkan tata kelola yang baik pada setiap kegiatan usaha pada seluruh tingkatan organisasi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 26",
+      "id": "fcbb4e59-fbdd-4f7c-9c96-e9ec4d71c366",
+      "low_confidence_text": false,
+      "number_label": "Pasal 26",
+      "provision_key": "PASAL-26",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Direksi wajib menyusun laporan pelaksanaan tata kelola dan menyampaikannya kepada Otoritas Jasa Keuangan paling lambat 4 (empat) bulan setelah tahun buku berakhir."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 31",
+      "id": "0200b1f0-8768-484f-a76a-fde6ce9e1a11",
+      "low_confidence_text": false,
+      "number_label": "Pasal 31",
+      "provision_key": "PASAL-31",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank wajib membentuk komite pemantau risiko yang diketuai oleh komisaris independen."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 38",
+      "id": "4ca415ea-8dfa-4a56-912d-bc9aaaf91531",
+      "low_confidence_text": false,
+      "number_label": "Pasal 38",
+      "provision_key": "PASAL-38",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 4,
+      "text": "Anggota Direksi dilarang merangkap jabatan sebagai anggota Direksi pada lembaga jasa keuangan lain."
+    }
+  ],
+  "sha256": "8dfa1cf0d5be179b79ba267864bb5e656627513cd72ca5619941c8c5e4ebe252",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/tatakelola/v3",
+  "updated_at": "2026-10-22T09:56:00.000000+00:00"
+}

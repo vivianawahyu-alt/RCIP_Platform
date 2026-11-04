@@ -26,6 +26,7 @@ class VersionState(StrEnum):
 
 class ProvisionType(StrEnum):
     BAB = "BAB"; BAGIAN = "BAGIAN"; PASAL = "PASAL"; AYAT = "AYAT"; HURUF = "HURUF"
+    PENJELASAN = "PENJELASAN"  # penjelasan resmi atas satu pasal (bagian "PASAL DEMI PASAL")
 
 
 class ChangeType(StrEnum):

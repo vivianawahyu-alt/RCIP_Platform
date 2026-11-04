@@ -1,0 +1,39 @@
+{
+  "effective_date": "2023-04-25",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "6a8a616f-c3b2-40d0-8edd-dfcd1e52d770",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 3",
+      "id": "61607459-85c7-404b-8693-da1139c6a1ca",
+      "low_confidence_text": false,
+      "number_label": "Pasal 3",
+      "provision_key": "PASAL-3",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Keuangan inklusif adalah kondisi ketika setiap anggota masyarakat mempunyai akses terhadap layanan keuangan formal."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 6",
+      "id": "6dc7cac7-fd72-4050-96a9-954fdc33e1f9",
+      "low_confidence_text": false,
+      "number_label": "Pasal 6",
+      "provision_key": "PASAL-6",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Kementerian dan lembaga dapat menyusun program pendukung keuangan inklusif."
+    }
+  ],
+  "sha256": "05d9d78f735f502f1a3da296e0e9de0a11364412cca5972f39d81ebeea712a84",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/perpres_s-114_2020/v1",
+  "updated_at": "2023-04-23T12:36:00.000000+00:00"
+}

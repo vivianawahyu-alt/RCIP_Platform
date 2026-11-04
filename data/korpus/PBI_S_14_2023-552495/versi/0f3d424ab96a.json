@@ -1,0 +1,51 @@
+{
+  "effective_date": "2024-07-12",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "f53d4330-cdda-44ba-ad06-e8cf3805f907",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 3",
+      "id": "d92c9227-eadf-4085-bfcb-75468eb22579",
+      "low_confidence_text": false,
+      "number_label": "Pasal 3",
+      "provision_key": "PASAL-3",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib mengumumkan suku bunga dasar kredit melalui situs web Bank setiap bulan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 5",
+      "id": "fce68504-87f8-424d-aae6-5fc176f2dbfe",
+      "low_confidence_text": false,
+      "number_label": "Pasal 5",
+      "provision_key": "PASAL-5",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib menyampaikan laporan suku bunga dasar kredit kepada Bank Indonesia paling lambat tanggal 7 (tujuh) bulan berikutnya."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 8",
+      "id": "9cd6c852-714c-4df4-a434-7d51c1581092",
+      "low_confidence_text": false,
+      "number_label": "Pasal 8",
+      "provision_key": "PASAL-8",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank dapat menambahkan komponen premi risiko sesuai profil debitur."
+    }
+  ],
+  "sha256": "0f3d424ab96abed69d6c3ebc5dd439c2b1200f559e165569d15b6b438cb02bd0",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pbi_s-14_2023/v1",
+  "updated_at": "2024-07-10T16:27:00.000000+00:00"
+}

@@ -1,10 +1,69 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import text
+# ======================================================================================================
+# DATABASE KHUSUS TES
+# Tes otomatis membuat dokumen, kewajiban, laporan, dst. Agar data itu TIDAK ikut tampil di website demo,
+# semua tes selalu dijalankan di database terpisah (bawaan: "rcip_test"), bukan di database website (rcip_db).
+# Database tes dibuat, dimigrasi (alembic upgrade head), dan diisi akun demo (seed.run) secara otomatis.
+# Nama lain bisa dipilih lewat variabel lingkungan TEST_DATABASE_NAME.
+# Bagian ini HARUS berada sebelum `from app.main import app`, karena koneksi database dibuat saat app di-import.
+# ======================================================================================================
+import os
 
-from app.main import app
-from app.shared.database import SessionLocal
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
+from app.shared.config import settings
+
+_main_url = make_url(settings.DATABASE_URL)                          # database website, mis. .../rcip_db
+_test_db = os.environ.get("TEST_DATABASE_NAME", "rcip_test")        # nama database tes
+if _main_url.database == _test_db:
+    raise RuntimeError("Database tes tidak boleh sama dengan database website")
+_test_url = _main_url.set(database=_test_db)
+
+
+def _prepare_test_database() -> None:
+    """Buat database tes bila belum ada, lalu jalankan migrasi terbaru dan seed akun demo."""
+    # 1) sambung ke database bawaan "postgres" untuk mengecek / membuat database tes
+    admin = create_engine(_main_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        exists = conn.scalar(text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": _test_db})
+        if not exists:
+            conn.execute(text(f'CREATE DATABASE "{_test_db}"'))
+    admin.dispose()
+
+    # 2) arahkan seluruh aplikasi (dan alembic) ke database tes
+    settings.DATABASE_URL = _test_url.render_as_string(hide_password=False)
+    os.environ["DATABASE_URL"] = settings.DATABASE_URL
+    # data tes tidak boleh ikut terekspor ke folder data/korpus milik tim
+    settings.CORPUS_SYNC_AUTO = False
+
+    # 3) migrasi ke versi terbaru; aman dijalankan berulang (migrasi yang sudah ada dilewati)
+    from alembic import command
+    from alembic.config import Config
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cfg = Config(os.path.join(root, "alembic.ini"))
+    cfg.set_main_option("script_location", os.path.join(root, "alembic"))
+    command.upgrade(cfg, "head")
+
+    # 4) akun demo (analyst, officer, ...) yang dipakai tes untuk login; seed.run aman dijalankan berulang
+    #    (fungsi seed() dipanggil langsung, bukan main(), agar argumen pytest seperti -q tidak ikut terbaca)
+    from app.shared.database import SessionLocal as _Session
+    from seed.run import seed
+    db = _Session()
+    try:
+        seed(db)
+        db.commit()
+    finally:
+        db.close()
+
+
+_prepare_test_database()
+
+# ---- setelah titik ini semua koneksi aplikasi sudah memakai database tes ----
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import app  # noqa: E402
+from app.shared.database import SessionLocal  # noqa: E402
 
 @pytest.fixture()
 def db():

@@ -1,0 +1,34 @@
+{
+  "canonical_number": "POJK S-08/2023",
+  "created_at": "2018-08-15T17:26:00.000000+00:00",
+  "deleted_at": null,
+  "format": 2,
+  "id": "a491f0b2-ea1f-4a65-a27a-984d654821d0",
+  "instrument_type": "POJK",
+  "issuer": "Otoritas Jasa Keuangan",
+  "labels": [
+    {
+      "dimension": "POPULATION",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "CONFIRMED",
+      "value": "Lembaga jasa keuangan (umum)"
+    },
+    {
+      "dimension": "THEME",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "SUGGESTED",
+      "value": "AML/CFT"
+    }
+  ],
+  "source": {
+    "base_url": "https://www.ojk.go.id",
+    "category": "OJK",
+    "issuer_name": "Otoritas Jasa Keuangan",
+    "name": "OJK",
+    "permitted_use_statement": null,
+    "status": "ACTIVE"
+  },
+  "title_id": "Penerapan Program Anti Pencucian Uang dan Pencegahan Pendanaan Terorisme di Sektor Lembaga Jasa Keuangan"
+}

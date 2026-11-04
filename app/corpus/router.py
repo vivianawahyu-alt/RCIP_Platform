@@ -53,6 +53,13 @@ def _get(db: Session, model, id_):
     return obj
 
 
+def _share(db: Session, doc_id=None) -> None:
+    """Ekspor otomatis dokumen ke data/korpus setelah perubahan tersimpan, agar bisa dibagikan ke tim lewat Git.
+    doc_id kosong = dokumen baru saja dihapus (tulis penanda hapus)."""
+    from app.corpus.sync import auto_export
+    auto_export(db, doc_id)
+
+
 @router.post("/api/v1/citations/resolve", response_model=ResponseWrapper[CitationResolveResponse])
 def resolve(payload: CitationResolveRequest, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
     """KONTRAK ANTAR-MODUL (dibekukan Minggu 4)."""
@@ -72,13 +79,15 @@ def create_document(body: DocumentCreate, db: Session = Depends(get_db), user: A
     suggest_labels(db, doc)
     audit(db, user.id, "DOCUMENT_CREATED", "document", doc.id)
     db.commit()
+    _share(db, doc.id)  # dokumen baru langsung terlihat oleh tim setelah di-push
     return ResponseWrapper(data={"id": str(doc.id)})
 
 
 @router.get("/api/v1/corpus/documents", response_model=ResponseWrapper[list])
 def list_documents(db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
     out = []
-    for d in db.scalars(select(Document).order_by(Document.canonical_number)):
+        # urutkan dari dokumen yang paling baru didaftarkan; bila waktunya sama, urut nomor regulasi
+    for d in db.scalars(select(Document).order_by(Document.created_at.desc(), Document.canonical_number)):
         vs = db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == d.id)
                         .order_by(DocumentVersion.version_number)).all()
         labels = [{"dimension": lb.dimension, "value": lb.value, "state": lb.state}
@@ -87,7 +96,9 @@ def list_documents(db: Session = Depends(get_db), _: AppUser = Depends(current_u
         out.append({"id": str(d.id), "canonical_number": d.canonical_number, "title_id": d.title_id,
                     "status": d.status, "instrument_type": d.instrument_type, "issuer": d.issuer, "labels": labels,
                     "versions": [{"id": str(v.id), "version_number": v.version_number, "state": v.state,
-                                  "effective_date": str(v.effective_date)} for v in vs]})
+                                  "effective_date": str(v.effective_date),
+                                  # [6a] cara teks versi diperoleh → UI menampilkan "teks via OCR"
+                                  "extraction_method": v.extraction_method} for v in vs]})
     return ResponseWrapper(data=out)
 
 
@@ -183,18 +194,24 @@ async def upload_version(
         "VERSION_INGESTED",
         "document_version",
         dv.id,
-        after={"provisions": n}
+        after={"provisions": n, "method": dv.extraction_method}  # [6b] catat juga cara teks diperoleh
     )
+    # [6b] FR-RKM-004: catat di jejak audit bahwa OCR dipakai dan di halaman mana
+    if dv.ocr_pages:
+        audit(db, user.id, "OCR_INVOKED", "document_version", dv.id, after={"pages": dv.ocr_pages})
 
-    # 9. Menyimpan transaksi database
+        # 9. Menyimpan transaksi database
     db.commit()
+    _share(db, doc.id)  # versi draf ikut dibagikan ke tim (data/korpus)
 
     return ResponseWrapper(
         data={
             "version_id": str(dv.id),
             "version_number": dv.version_number,
             "provisions_created": n,
-            "state": dv.state
+            "state": dv.state,
+            "extraction_method": dv.extraction_method,  # [6c] dipakai UI untuk menampilkan notifikasi OCR
+            "ocr_pages": dv.ocr_pages
         }
     )
 
@@ -209,7 +226,9 @@ def list_provisions(version_id: str, db: Session = Depends(get_db), _: AppUser =
     return ResponseWrapper(data=[{"provision_version_id": str(pv.id), "number_label": p.number_label,
                                   "path": p.hierarchical_path, "text": pv.text,
                                   "confidence": float(pv.segmentation_confidence),
-                                  "corrected_by_human": pv.corrected_by_human} for pv, p in rows])
+                                  "corrected_by_human": pv.corrected_by_human,
+                                  "low_confidence_text": pv.low_confidence_text  # [6d] true → badge "Teks OCR" di UI
+                                  } for pv, p in rows])
 
 
 @router.patch("/api/v1/corpus/provision-versions/{pv_id}", response_model=ResponseWrapper[dict])
@@ -219,11 +238,37 @@ def correct_provision(pv_id: str, body: ProvisionCorrection, db: Session = Depen
     dv = db.get(DocumentVersion, pv.document_version_id)
     if dv.state not in (VersionState.SEGMENTED_DRAFT.value, VersionState.UNDER_CORRECTION.value):
         raise AppError(409, "VERSION_IMMUTABLE", "Versi yang sudah dipublikasikan tidak dapat diubah")
-    before = {"text": pv.text}
-    pv.text, pv.corrected_by_human, dv.state = body.text, True, VersionState.UNDER_CORRECTION.value
+    # [6e] validasi + koreksi sekaligus menghapus tanda OCR
+    if not body.text.strip():  # cegah pasal tersimpan kosong
+        raise AppError(422, "EMPTY_TEXT", "Teks pasal tidak boleh kosong")
+    before = {"text": pv.text, "low_confidence_text": pv.low_confidence_text}  # nilai lama untuk jejak audit
+    # koreksi manual sekaligus menandai teks OCR sudah diperiksa analis
+    pv.text, pv.corrected_by_human, pv.low_confidence_text = body.text, True, False
+    dv.state = VersionState.UNDER_CORRECTION.value  # versi berstatus "sedang dikoreksi" (masih draf)
     audit(db, user.id, "PROVISION_CORRECTED", "provision_version", pv.id, before=before, after={"text": body.text})
     db.commit()
+    _share(db, dv.document_id)  # koreksi teks ikut dibagikan ke tim
     return ResponseWrapper(data={"id": str(pv.id)})
+
+
+# [6e] ENDPOINT BARU: tombol "Konfirmasi teks" di UI memanggil endpoint ini (khusus Analis)
+@router.post("/api/v1/corpus/provision-versions/{pv_id}/confirm-text", response_model=ResponseWrapper[dict])
+def confirm_text(pv_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+    """FR-RKM-004: analis menyatakan teks hasil OCR sudah sesuai PDF aslinya (tanpa mengubah teks)."""
+    pv = _get(db, ProvisionVersion, pv_id)              # pasal yang dikonfirmasi (404 bila tidak ada)
+    dv = db.get(DocumentVersion, pv.document_version_id)  # versi dokumennya
+    # hanya versi draf yang boleh diubah; versi terbit sudah beku
+    if dv.state not in (VersionState.SEGMENTED_DRAFT.value, VersionState.UNDER_CORRECTION.value):
+        raise AppError(409, "VERSION_IMMUTABLE", "Versi yang sudah dipublikasikan tidak dapat diubah")
+    # pasal yang bukan dari OCR (atau sudah dikonfirmasi) tidak perlu dikonfirmasi lagi
+    if not pv.low_confidence_text:
+        raise AppError(409, "NOTHING_TO_CONFIRM", "Pasal ini bukan teks OCR yang menunggu konfirmasi")
+    # hapus tanda OCR + tandai sudah diperiksa manusia; teks pasal tidak diubah
+    pv.low_confidence_text, pv.corrected_by_human = False, True
+    audit(db, user.id, "TEXT_CONFIRMED_BY_ANALYST", "provision_version", pv.id)  # siapa mengonfirmasi, kapan
+    db.commit()
+    _share(db, dv.document_id)  # konfirmasi OCR ikut dibagikan ke tim
+    return ResponseWrapper(data={"id": str(pv.id), "low_confidence_text": False})
 
 
 @router.post("/api/v1/corpus/versions/{version_id}/publish", response_model=ResponseWrapper[dict])
@@ -232,6 +277,7 @@ def publish(version_id: str, db: Session = Depends(get_db), user: AppUser = Depe
     services.publish_version(db, dv)
     audit(db, user.id, "VERSION_PUBLISHED", "document_version", dv.id)
     db.commit()
+    _share(db, dv.document_id)  # status terbit ikut dibagikan ke tim
     return ResponseWrapper(data={"version_id": str(dv.id), "state": dv.state})
 
 
@@ -324,6 +370,7 @@ def delete_version(version_id: str, db: Session = Depends(get_db), user: AppUser
         raise AppError(409, "STILL_REFERENCED", f"Versi masih dirujuk data lain: {str(e.orig).splitlines()[0]}")
     audit(db, user.id, "VERSION_DELETED", "document_version", uuid.UUID(version_id), before={**snapshot, "provisions": n})
     db.commit()
+    _share(db, snapshot["document_id"])  # penanda hapus agar laptop lain ikut menghapus draf ini
     return ResponseWrapper(data={"deleted_version_id": version_id, "provisions_deleted": n})
 
 
@@ -350,6 +397,7 @@ def withdraw_version(version_id: str, body: WithdrawRequest, db: Session = Depen
     audit(db, user.id, "VERSION_WITHDRAWN", "document_version", dv.id,
           before={"state": "PUBLISHED"}, after={"state": dv.state, "reason": body.reason.strip()})
     db.commit()
+    _share(db, dv.document_id)  # penarikan ikut dibagikan ke tim
     return ResponseWrapper(data={"version_id": str(dv.id), "state": dv.state, "document_status": doc.status})
 
 
@@ -389,4 +437,5 @@ def delete_document(doc_id: str, db: Session = Depends(get_db), user: AppUser = 
         raise AppError(409, "STILL_REFERENCED", f"Dokumen masih dirujuk data lain: {str(e.orig).splitlines()[0]}")
     audit(db, user.id, "DOCUMENT_DELETED", "document", uuid.UUID(doc_id), before=snapshot)
     db.commit()
+    _share(db)  # penanda hapus dokumen untuk laptop lain
     return ResponseWrapper(data={"deleted_document_id": doc_id})

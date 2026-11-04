@@ -1,0 +1,51 @@
+{
+  "effective_date": "2026-08-05",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "b82c9074-afd5-4ea5-89d7-fd6cce777f00",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 4",
+      "id": "11e9cdaa-6e69-41a3-9d3d-9e563270e4fa",
+      "low_confidence_text": false,
+      "number_label": "Pasal 4",
+      "provision_key": "PASAL-4",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib memiliki kebijakan dan prosedur penggunaan penyedia jasa yang disetujui Direksi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 11",
+      "id": "d9178793-a9d3-42e6-905c-c6869f871ce7",
+      "low_confidence_text": false,
+      "number_label": "Pasal 11",
+      "provision_key": "PASAL-11",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib melakukan evaluasi kinerja penyedia jasa paling sedikit 1 (satu) kali dalam 1 (satu) tahun."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 27",
+      "id": "688c7015-aab9-4e49-8f2d-479681d2c7de",
+      "low_confidence_text": false,
+      "number_label": "Pasal 27",
+      "provision_key": "PASAL-27",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Ketentuan sebagaimana diatur dalam POJK S-09/2016 dicabut dan dinyatakan tidak berlaku. Bank wajib menyesuaikan perjanjian alih daya paling lambat 12 (dua belas) bulan sejak Peraturan ini berlaku."
+    }
+  ],
+  "sha256": "860d7b24cc4789061a77387ced3d3599a107de792d552b2dbd7f282a6eeae6e6",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/alihdaya/v1",
+  "updated_at": "2026-08-03T13:25:00.000000+00:00"
+}

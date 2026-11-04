@@ -1,0 +1,39 @@
+{
+  "effective_date": "2023-10-27",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "7bc67e1f-c64e-46e3-89c5-b31aeb6c1016",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 14",
+      "id": "da09dfa0-5282-4d80-84b5-91f797ac6aa8",
+      "low_confidence_text": false,
+      "number_label": "Pasal 14",
+      "provision_key": "PASAL-14",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Penyelenggara Sistem Elektronik wajib melaksanakan prinsip pelindungan data pribadi dalam pemrosesan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 24",
+      "id": "3e6dd58b-7367-428d-a1b2-94de4767d76c",
+      "low_confidence_text": false,
+      "number_label": "Pasal 24",
+      "provision_key": "PASAL-24",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyelenggara Sistem Elektronik wajib memberitahukan secara tertulis kepada pemilik data pribadi apabila terjadi kegagalan pelindungan."
+    }
+  ],
+  "sha256": "0811267f1b5e82b14a131270f6e8a9d4d3f151ad8e620cbad54a6b9f98e1cd0a",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pp_s-71_2019/v1",
+  "updated_at": "2023-10-25T15:36:00.000000+00:00"
+}

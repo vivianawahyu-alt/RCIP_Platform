@@ -1,0 +1,34 @@
+{
+  "canonical_number": "POJK S-10/2022",
+  "created_at": "2018-08-15T17:26:00.000000+00:00",
+  "deleted_at": null,
+  "format": 2,
+  "id": "546e035a-292b-4156-9b94-65701ac70ec0",
+  "instrument_type": "POJK",
+  "issuer": "Otoritas Jasa Keuangan",
+  "labels": [
+    {
+      "dimension": "POPULATION",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "CONFIRMED",
+      "value": "Penyelenggara LPBBTI"
+    },
+    {
+      "dimension": "THEME",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "CONFIRMED",
+      "value": "Risiko TI dan siber"
+    }
+  ],
+  "source": {
+    "base_url": "https://www.ojk.go.id",
+    "category": "OJK",
+    "issuer_name": "Otoritas Jasa Keuangan",
+    "name": "OJK",
+    "permitted_use_statement": null,
+    "status": "ACTIVE"
+  },
+  "title_id": "Layanan Pendanaan Bersama Berbasis Teknologi Informasi (Pinjam Meminjam)"
+}

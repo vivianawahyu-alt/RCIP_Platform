@@ -32,6 +32,8 @@ class Document(Base):
     issuer = Column(String, nullable=False)
     title_id = Column(String, nullable=False)
     status = Column(String, nullable=False, default="DRAFT")
+    # waktu dokumen didaftarkan; dipakai untuk mengurutkan daftar korpus (terbaru di atas)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
 class DocumentVersion(Base):
@@ -46,6 +48,8 @@ class DocumentVersion(Base):
     effective_date = Column(Date, nullable=False)
     state = Column(String, nullable=False, default="PARSING")
     is_partial = Column(Boolean, nullable=False, default=False)
+    extraction_method = Column(String, nullable=False, default="TEXT_LAYER")  # TEXT_LAYER | OCR | PLAIN_TEXT
+    ocr_pages = Column(JSONB, nullable=False, default=list)  # halaman yang dibaca lewat OCR, mis. [1, 2]
 
 
 class Provision(Base):
@@ -69,6 +73,7 @@ class ProvisionVersion(Base):
     text = Column(Text, nullable=False)
     segmentation_confidence = Column(Numeric(3, 2), nullable=False, default=0.85)
     corrected_by_human = Column(Boolean, nullable=False, default=False)
+    low_confidence_text = Column(Boolean, nullable=False, default=False)  # teks OCR belum dikonfirmasi analis
     text_search = Column(TSVECTOR, Computed("to_tsvector('indonesian', text)", persisted=True))
 
 

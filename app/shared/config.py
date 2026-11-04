@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     LLM_MODEL_NAME: str = "gpt-4o-mini"
 
+    # Sinkronisasi korpus tim lewat Git (app/corpus/sync.py): ekspor otomatis saat korpus berubah
+    # & impor otomatis saat api menyala. Set false di .env untuk mematikan.
+    CORPUS_SYNC_AUTO: bool = True
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     def assert_safe_for_environment(self) -> None:

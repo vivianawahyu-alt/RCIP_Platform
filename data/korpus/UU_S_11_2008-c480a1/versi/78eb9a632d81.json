@@ -1,0 +1,39 @@
+{
+  "effective_date": "2023-07-08",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "31b1b099-d527-41e7-99bc-143efb02bebb",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 15",
+      "id": "88bd13d1-b540-430e-839f-3a254d6168bd",
+      "low_confidence_text": false,
+      "number_label": "Pasal 15",
+      "provision_key": "PASAL-15",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Setiap Penyelenggara Sistem Elektronik wajib menyelenggarakan Sistem Elektronik secara andal dan aman."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 16",
+      "id": "b289f224-4ac9-478d-8da8-eee40df56ac6",
+      "low_confidence_text": false,
+      "number_label": "Pasal 16",
+      "provision_key": "PASAL-16",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyelenggara Sistem Elektronik wajib mengoperasikan Sistem Elektronik yang dapat menampilkan kembali informasi elektronik secara utuh."
+    }
+  ],
+  "sha256": "78eb9a632d81c8c71bf1a5b9dba0a3945eeaae1cc9a4feef73334f9717adcee7",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/uu_s-11_2008/v1",
+  "updated_at": "2023-07-06T10:40:00.000000+00:00"
+}

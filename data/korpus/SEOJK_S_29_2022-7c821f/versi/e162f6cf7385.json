@@ -1,0 +1,63 @@
+{
+  "effective_date": "2026-10-14",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "0f02bad0-e706-4ef4-a6aa-9385dd59ba71",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 3",
+      "id": "fc3d3348-008d-4127-a104-61e32a25a888",
+      "low_confidence_text": false,
+      "number_label": "Pasal 3",
+      "provision_key": "PASAL-3",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib melakukan penilaian tingkat maturitas keamanan siber paling sedikit 1 (satu) kali dalam 1 (satu) tahun."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 7",
+      "id": "c8b8d9c6-ed30-49cf-83e4-58fc63f2ae24",
+      "low_confidence_text": false,
+      "number_label": "Pasal 7",
+      "provision_key": "PASAL-7",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib melakukan uji penetrasi terhadap sistem elektronik kritikal paling sedikit 2 (dua) kali dalam 1 (satu) tahun."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 9",
+      "id": "6c4a37ea-4906-47f2-b47b-6dbac8fe3ccd",
+      "low_confidence_text": false,
+      "number_label": "Pasal 9",
+      "provision_key": "PASAL-9",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank wajib melaporkan insiden siber kepada Otoritas Jasa Keuangan paling lambat 24 (dua puluh empat) jam setelah insiden diketahui."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 14",
+      "id": "fed4057d-bb02-4576-b512-c4c3b253d218",
+      "low_confidence_text": false,
+      "number_label": "Pasal 14",
+      "provision_key": "PASAL-14",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 4,
+      "text": "Bank wajib memiliki unit atau fungsi yang bertanggung jawab atas ketahanan dan keamanan siber."
+    }
+  ],
+  "sha256": "e162f6cf7385d16dc1d1c4f1eb57d6ae709ec0129fc6cf5ed8fea2f268c75e88",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/siber/v2",
+  "updated_at": "2026-10-12T16:42:00.000000+00:00"
+}

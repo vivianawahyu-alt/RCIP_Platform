@@ -1,0 +1,39 @@
+{
+  "effective_date": "2023-01-04",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "93403fad-dc4a-456b-9601-6237ac9ed156",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 5",
+      "id": "44feacae-d248-49a7-ac1a-a554c3c75611",
+      "low_confidence_text": false,
+      "number_label": "Pasal 5",
+      "provision_key": "PASAL-5",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib mempublikasikan laporan keuangan triwulanan pada situs web Bank paling lambat akhir bulan kedua setelah akhir triwulan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 9",
+      "id": "a6c9537f-84da-406a-b872-bdeb2cd94cbb",
+      "low_confidence_text": false,
+      "number_label": "Pasal 9",
+      "provision_key": "PASAL-9",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib menyampaikan laporan tahunan kepada Otoritas Jasa Keuangan paling lambat 4 (empat) bulan setelah tahun buku berakhir."
+    }
+  ],
+  "sha256": "d3d34dff5c99886e1858687517850337332e6e8f8ef3ce87d911d2c2fc4429cb",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pojk_s-37_2019/v1",
+  "updated_at": "2023-01-02T15:58:00.000000+00:00"
+}

@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,7 +22,22 @@ from app.shared.observability import RequestContextMiddleware
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 settings.assert_safe_for_environment()
 
-app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0", docs_url="/docs",
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Saat api menyala: tambahkan korpus dari data/korpus (hasil Pull dari tim) ke database laptop ini.
+    Gagal impor tidak menghentikan aplikasi; cukup tercatat di log."""
+    if settings.CORPUS_SYNC_AUTO:
+        try:
+            from app.corpus.sync import import_all
+            s = import_all()
+            logging.getLogger("rcip.corpus_sync").info("Impor korpus tim: %s", {k: v for k, v in s.items() if v})
+        except Exception:  # noqa: BLE001
+            logging.getLogger("rcip.corpus_sync").exception(
+                "Impor korpus tim gagal; jalankan alembic upgrade head lalu docker compose restart api")
+    yield
+
+
+app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0", docs_url="/docs", lifespan=lifespan,
               description="RCIP API — kontrak v1. Semua endpoint (kecuali /auth/login dan /health) memerlukan Bearer JWT.")
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_credentials=True,

@@ -1,0 +1,51 @@
+{
+  "effective_date": "2023-03-19",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "43bfd931-3605-4f54-a021-c0ca3531968d",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 2",
+      "id": "2812859a-1337-439e-8d4f-5d272c7f0b79",
+      "low_confidence_text": false,
+      "number_label": "Pasal 2",
+      "provision_key": "PASAL-2",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Bank wajib menerapkan manajemen risiko secara efektif baik secara individual maupun konsolidasi."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 21",
+      "id": "085b15fb-4a8f-4810-b84c-2f29980402a2",
+      "low_confidence_text": false,
+      "number_label": "Pasal 21",
+      "provision_key": "PASAL-21",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Bank wajib menyampaikan laporan profil risiko kepada Otoritas Jasa Keuangan setiap triwulan paling lambat 15 (lima belas) hari kerja setelah akhir triwulan."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 25",
+      "id": "1238d630-743b-45a2-9c0f-2fcfb3f6fe0d",
+      "low_confidence_text": false,
+      "number_label": "Pasal 25",
+      "provision_key": "PASAL-25",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Bank wajib memiliki satuan kerja manajemen risiko yang independen terhadap satuan kerja operasional."
+    }
+  ],
+  "sha256": "43681a57cd8ae0d28a221db8f01061cf897638e30ba22319964cbd37d7a12e9a",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pojk_s-18_2016/v1",
+  "updated_at": "2023-03-17T11:59:00.000000+00:00"
+}

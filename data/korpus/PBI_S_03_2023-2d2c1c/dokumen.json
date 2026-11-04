@@ -1,0 +1,34 @@
+{
+  "canonical_number": "PBI S-03/2023",
+  "created_at": "2018-08-15T17:26:00.000000+00:00",
+  "deleted_at": null,
+  "format": 2,
+  "id": "6bebac31-d4f8-4d72-b382-1cfdc083b73a",
+  "instrument_type": "PBI",
+  "issuer": "Bank Indonesia",
+  "labels": [
+    {
+      "dimension": "POPULATION",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "SUGGESTED",
+      "value": "Lembaga jasa keuangan (umum)"
+    },
+    {
+      "dimension": "THEME",
+      "reason": "Kata kunci judul",
+      "source": "RULE",
+      "state": "CONFIRMED",
+      "value": "Perlindungan konsumen"
+    }
+  ],
+  "source": {
+    "base_url": "https://www.bi.go.id",
+    "category": "BANK_INDONESIA",
+    "issuer_name": "Bank Indonesia",
+    "name": "BANK_INDONESIA",
+    "permitted_use_statement": null,
+    "status": "ACTIVE"
+  },
+  "title_id": "Pelindungan Konsumen Bank Indonesia bagi Lembaga Jasa Keuangan"
+}

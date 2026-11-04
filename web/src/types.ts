@@ -5,7 +5,8 @@ export type User = { id: string; username: string; role: Role };
 export type Citation = { provision_version_id: string; canonical_number: string; number_label: string };
 export type Doc = { id: string; canonical_number: string; title_id: string; status: string; instrument_type: string; issuer?: string;
   labels?: { dimension: string; value: string; state: string }[];
-  versions: { id: string; version_number: number; state: string; effective_date: string }[] };
+  // [9] extraction_method: "TEXT_LAYER" | "OCR" | "PLAIN_TEXT" (cara teks versi ini diperoleh)
+  versions: { id: string; version_number: number; state: string; effective_date: string; extraction_method?: string }[] };
 export type Obligation = { id: string; state: string; summary: string; deadline: string | null; derived_from_ai: boolean;
   confidence?: number | null; owner_id?: string | null; owner?: string | null; validator?: string | null; approver?: string | null;
   frequency?: string | null; original_text?: string; created_at?: string; citation: Citation;

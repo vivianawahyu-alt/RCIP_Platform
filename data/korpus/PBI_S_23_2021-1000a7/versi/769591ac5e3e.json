@@ -1,0 +1,51 @@
+{
+  "effective_date": "2024-08-25",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "e87d1c78-e7c4-41c7-8049-7b717d106c60",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 1",
+      "id": "0b49452d-46d4-43f3-9450-281c6c6f7633",
+      "low_confidence_text": false,
+      "number_label": "Pasal 1",
+      "provision_key": "PASAL-1",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Penyelenggara Jasa Pembayaran adalah bank atau lembaga selain bank yang menyediakan jasa untuk memfasilitasi transaksi pembayaran."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 47",
+      "id": "295d6fbf-430f-401d-bad4-09e2a319dcb4",
+      "low_confidence_text": false,
+      "number_label": "Pasal 47",
+      "provision_key": "PASAL-47",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyelenggara Jasa Pembayaran wajib menyampaikan laporan berkala kepada Bank Indonesia setiap bulan paling lambat tanggal 15 bulan berikutnya."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 52",
+      "id": "1ca3c448-0279-46a6-8f97-97b06d7ce3c9",
+      "low_confidence_text": false,
+      "number_label": "Pasal 52",
+      "provision_key": "PASAL-52",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 3,
+      "text": "Penyelenggara Jasa Pembayaran wajib menerapkan manajemen risiko dan standar keamanan sistem informasi."
+    }
+  ],
+  "sha256": "769591ac5e3efc6843c01c0593901ce93ce246a0ac65e52e9082f84011fcdad3",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pjp/v1",
+  "updated_at": "2024-08-23T09:56:00.000000+00:00"
+}

@@ -1,0 +1,39 @@
+{
+  "effective_date": "2024-01-09",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "1d5206ab-b7e6-427c-bf78-0e3ff6b751f7",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 5",
+      "id": "0692dc63-9424-4ed5-9bac-5c154fa03f26",
+      "low_confidence_text": false,
+      "number_label": "Pasal 5",
+      "provision_key": "PASAL-5",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Penyelenggara Transfer Dana wajib mencantumkan identitas pengirim dalam setiap perintah transfer dana."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 12",
+      "id": "658b2523-6014-4de9-b54a-d0a2e87466d7",
+      "low_confidence_text": false,
+      "number_label": "Pasal 12",
+      "provision_key": "PASAL-12",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyelenggara Transfer Dana wajib mengembalikan dana yang gagal ditransfer paling lambat 2 (dua) hari kerja."
+    }
+  ],
+  "sha256": "e086135b31febb89dd1a7d4eb5746388839a67a351a5988d6de07ac89e49d2b9",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pbi_s-19_2022/v1",
+  "updated_at": "2024-01-07T11:04:00.000000+00:00"
+}

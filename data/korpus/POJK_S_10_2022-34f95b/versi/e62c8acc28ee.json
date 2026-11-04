@@ -1,0 +1,39 @@
+{
+  "effective_date": "2022-11-28",
+  "extraction_method": "TEXT_LAYER",
+  "file": null,
+  "id": "49c8a43f-7ed7-4ed7-b194-990b6961929e",
+  "is_partial": false,
+  "ocr_pages": [],
+  "origin_url": "synthetic://generator",
+  "provisions": [
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 8",
+      "id": "746f7891-0964-4bbf-8cd3-21b0c2b01cfd",
+      "low_confidence_text": false,
+      "number_label": "Pasal 8",
+      "provision_key": "PASAL-8",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 1,
+      "text": "Penyelenggara wajib berbentuk badan hukum perseroan terbatas."
+    },
+    {
+      "corrected_by_human": false,
+      "hierarchical_path": "BAB I/Pasal 44",
+      "id": "6778043b-c5c5-437a-b85e-06a11dad09b2",
+      "low_confidence_text": false,
+      "number_label": "Pasal 44",
+      "provision_key": "PASAL-44",
+      "provision_type": "PASAL",
+      "segmentation_confidence": 0.95,
+      "sequence": 2,
+      "text": "Penyelenggara wajib menyampaikan laporan bulanan kepada Otoritas Jasa Keuangan."
+    }
+  ],
+  "sha256": "e62c8acc28ee04287c080b106431823c6230cb58777afade1a932232f220fe65",
+  "state": "PUBLISHED",
+  "storage_key": "synthetic/pojk_s-10_2022/v1",
+  "updated_at": "2022-11-26T16:52:00.000000+00:00"
+}
