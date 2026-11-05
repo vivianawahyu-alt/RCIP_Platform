@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { Me, Role } from "./types";
+import { canDo } from "./permissions";
 
 export type Notify = (kind: "ok" | "error", text: string) => void;
 export type Ctx = { me: Me; notify: Notify; go: (route: string) => void; openCite: (pvId: string) => void };
@@ -74,20 +75,31 @@ export const fmtDate = (s?: string | null) => s ? new Date(s.length === 10 ? s +
 export const fmtTime = (s?: string | null) => s ? new Date(s).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 export const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
-/** Matriks izin UI (cermin dari otorisasi server; server tetap sumber kebenaran). */
-export const can = (role: Role, action: string): boolean => {
-  const M: Record<string, Role[]> = {
-    corpus_write: ["REGULATORY_ANALYST"], obligation_extract: ["COMPLIANCE_OFFICER"], obligation_validate: ["COMPLIANCE_OFFICER"],
-    obligation_approve: ["COMPLIANCE_MANAGER"], risk_control_write: ["COMPLIANCE_OFFICER"], evidence_upload: ["COMPLIANCE_OFFICER", "BUSINESS_CONTROL_OWNER"],
-    evidence_review: ["COMPLIANCE_OFFICER"], assess: ["COMPLIANCE_OFFICER"], signoff: ["COMPLIANCE_MANAGER"],
-    finding_create: ["COMPLIANCE_OFFICER"], gap_scan: ["COMPLIANCE_OFFICER", "COMPLIANCE_MANAGER"],
-    action_create: ["COMPLIANCE_OFFICER", "BUSINESS_CONTROL_OWNER"], closure_validate: ["COMPLIANCE_MANAGER"],
-    report_generate: ["COMPLIANCE_OFFICER"], report_issue: ["COMPLIANCE_MANAGER"],
-    audit_read: ["INTERNAL_AUDITOR", "SYSTEM_ADMINISTRATOR", "COMPLIANCE_MANAGER", "LEGAL_REVIEWER", "REGULATORY_ANALYST", "COMPLIANCE_OFFICER"],
-    evidence_download: ["REGULATORY_ANALYST", "COMPLIANCE_OFFICER", "BUSINESS_CONTROL_OWNER", "LEGAL_REVIEWER", "COMPLIANCE_MANAGER", "INTERNAL_AUDITOR"],
-  };
-  return (M[action] || []).includes(role);
+/** Izin UI = salinan matriks RBAC server (web/src/permissions.ts, dibangkitkan otomatis). Server tetap sumber kebenaran. */
+const ACTION: Record<string, [string, string]> = {
+  corpus_write: ["ingestion", "X"], obligation_extract: ["obligation", "C"], obligation_validate: ["obligation", "U"],
+  obligation_approve: ["obligation", "A"], risk_control_write: ["control_library", "C"], evidence_upload: ["evidence_upload", "C"],
+  evidence_review: ["evidence_request", "U"], assess: ["assessment_conclusion", "C"], signoff: ["assessment_conclusion", "A"],
+  finding_create: ["finding", "C"], gap_scan: ["finding", "C"], action_create: ["remediation", "C"],
+  closure_validate: ["finding_closure", "A"], closure_propose: ["finding_closure", "C"], report_generate: ["report_draft", "C"],
+  report_issue: ["report_issue", "A"], audit_read: ["audit_trail", "R"], evidence_download: ["evidence_access", "R"],
+  applicability_create: ["applicability", "C"], profile_update: ["org_profile", "U"],
+  user_admin_read: ["user_admin", "R"], user_admin_write: ["user_admin", "C"], config_read: ["system_config", "R"],
 };
+export const can = (role: Role, action: string): boolean => {
+  const [cap, letter] = ACTION[action] || ["", ""];
+  return !!cap && canDo(role, cap, letter);
+};
+/** Halaman → kapabilitas yang harus bisa DIBACA agar halaman/menu tampil. Peran tanpa akses tidak melihat halamannya. */
+const PAGE_READ: Record<string, [string, string][]> = {
+  beranda: [["dashboard", "R"]], cari: [["corpus_search", "R"]], copilot: [["copilot_query", "X"]],
+  regulasi: [["source_registry", "R"], ["document_version", "R"]], perubahan: [["change_review", "R"]],
+  keberlakuan: [["applicability", "R"]], kewajiban: [["obligation", "R"]], kontrol: [["control_library", "R"]],
+  asesmen: [["assessment_conclusion", "R"]], temuan: [["finding", "R"]], laporan: [["report_published", "R"]],
+  audit: [["audit_trail", "R"]], admin: [["system_config", "R"], ["user_admin", "R"]],
+};
+export const canSeePage = (role: Role, page: string): boolean =>
+  (PAGE_READ[page] || [["dashboard", "R"]]).some(([c, l]) => canDo(role, c, l));
 
 export function ImpactIcon({ level }: { level: "high" | "medium" | "low" }) {
   const c = level === "high" ? "#b42318" : level === "medium" ? "#b54708" : "#667085";

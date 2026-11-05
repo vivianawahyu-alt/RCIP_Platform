@@ -21,6 +21,9 @@ class AppUser(Base):
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False)
+    # D (soft) pada matriks "Administrasi pengguna dan peran": akun dinonaktifkan, tidak pernah dihapus fisik,
+    # supaya jejak audit & approval yang menunjuk user_id tetap utuh.
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(DateTime(timezone=True), default=_now)
 
 

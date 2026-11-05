@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names
 from app.compliance.models import ApplicabilityDecision, OrganisationProfile
 from app.corpus.models import Document, DocumentVersion, ProvisionVersion, Provision, TaxonomyLabel
-from app.platform.auth import current_user, require_roles
 from app.platform.governance import audit, record_approval
 from app.platform.models import AppUser
+from app.platform.permissions import require
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import ResponseWrapper
@@ -25,9 +25,11 @@ from app.shared.vocabularies import AppRole, ApplicabilityValue, ControlPoint
 
 router = APIRouter(prefix="/api/v1/compliance", tags=["applicability"])
 R = AppRole
-OFFICER = require_roles(R.COMPLIANCE_OFFICER)
-MANAGER = require_roles(R.COMPLIANCE_MANAGER)
-LEGAL = require_roles(R.LEGAL_REVIEWER)
+# Otorisasi = matriks RBAC (app/shared/rbac_matrix.py): "Organization Profile" & "Applicability Decision".
+OFFICER_CREATE = require("applicability", "C")                                  # Pejabat Kepatuhan
+OFFICER_UPDATE = require("applicability", "U", only=[R.COMPLIANCE_OFFICER])     # eskalasi/ajukan/buka ulang = alur Pejabat
+LEGAL = require("applicability", "U", only=[R.LEGAL_REVIEWER])                  # Peninjau Hukum: RU → memberi posisi hukum
+MANAGER = require("applicability", "A")                                         # Manajer Kepatuhan (titik kendali #2)
 
 ENTITY_RULES = {"bank umum": {"BANK_UMUM"}, "perbankan syariah": {"BANK_SYARIAH"}, "bpr": {"BPR"},
                 "penyelenggara jasa pembayaran": {"PJP"}, "lembaga jasa keuangan": {"BANK_UMUM", "BPR", "PJP", "BANK_SYARIAH"}}
@@ -140,14 +142,15 @@ def approved_decision_for(db: Session, dv_id, profile_id, pv_id=None) -> Optiona
 
 
 @router.get("/profiles", response_model=ResponseWrapper[list])
-def list_profiles(db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_profiles(db: Session = Depends(get_db), _: AppUser = Depends(require("org_profile", "R"))):
     return ResponseWrapper(data=[{"id": str(p.id), "organisation_name": p.organisation_name, "entity_type": p.entity_type,
                                   "licenses": p.licenses, "business_lines": p.business_lines, "version": p.version}
                                  for p in db.scalars(select(OrganisationProfile))])
 
 
 @router.put("/profiles/{pid}", response_model=ResponseWrapper[dict])
-def update_profile(pid: str, body: ProfileUpdateIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def update_profile(pid: str, body: ProfileUpdateIn, db: Session = Depends(get_db),
+                   user: AppUser = Depends(require("org_profile", "U"))):
     """E7.1: perubahan atribut profil → keputusan APPROVED yang bersandar padanya menjadi REVIEW_REQUIRED."""
     p = get_or_404(db, OrganisationProfile, pid)
     just = require_text(body.justification, "justification")
@@ -176,7 +179,8 @@ def update_profile(pid: str, body: ProfileUpdateIn, db: Session = Depends(get_db
 
 
 @router.get("/applicability", response_model=ResponseWrapper[list])
-def list_decisions(state: Optional[str] = None, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_decisions(state: Optional[str] = None, db: Session = Depends(get_db),
+                   _: AppUser = Depends(require("applicability", "R"))):
     names = user_names(db)
     stmt = select(ApplicabilityDecision).order_by(ApplicabilityDecision.created_at.desc())
     if state:
@@ -185,7 +189,7 @@ def list_decisions(state: Optional[str] = None, db: Session = Depends(get_db), _
 
 
 @router.post("/applicability/suggest", response_model=ResponseWrapper[dict])
-def suggest(body: SuggestIn, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def suggest(body: SuggestIn, db: Session = Depends(get_db), _: AppUser = Depends(OFFICER_CREATE)):
     p, dv = _profile(db, body.profile_id), get_or_404(db, DocumentVersion, body.version_id)
     value, reason, codes = suggest_applicability(db, p, dv)
     return ResponseWrapper(data={"suggested_value": value, "reason": reason, "reason_codes": codes,
@@ -202,7 +206,7 @@ def _validate_payload(db: Session, dv: DocumentVersion, body: DecisionDraftIn) -
 
 
 @router.post("/applicability", response_model=ResponseWrapper[dict])
-def create_decision(body: DecisionDraftIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def create_decision(body: DecisionDraftIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_CREATE)):
     p, dv = _profile(db, body.profile_id), get_or_404(db, DocumentVersion, body.version_id)
     if dv.state != "PUBLISHED":
         raise AppError(409, "VERSION_NOT_PUBLISHED", "Keberlakuan hanya untuk versi berstatus PUBLISHED")
@@ -232,7 +236,7 @@ def _decision(db: Session, did: str, states: set[str]) -> ApplicabilityDecision:
 
 
 @router.post("/applicability/{did}/escalate", response_model=ResponseWrapper[dict])
-def escalate(did: str, body: QuestionIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def escalate(did: str, body: QuestionIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_UPDATE)):
     d = _decision(db, did, {"IN_ASSESSMENT", "REJECTED_TO_MAKER"})
     d.legal_question, d.state = require_text(body.question, "question"), "PENDING_LEGAL"
     audit(db, user.id, "APPLICABILITY_ESCALATED", "applicability_decision", d.id, after={"question": d.legal_question})
@@ -250,7 +254,7 @@ def legal_answer(did: str, body: AnswerIn, db: Session = Depends(get_db), user: 
 
 
 @router.post("/applicability/{did}/submit", response_model=ResponseWrapper[dict])
-def submit(did: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def submit(did: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_UPDATE)):
     d = _decision(db, did, {"IN_ASSESSMENT", "REJECTED_TO_MAKER"})
     if not d.cited_provision_version_ids:
         raise AppError(422, "CITATION_REQUIRED", "Keputusan wajib memuat minimal satu sitasi ketentuan")
@@ -292,7 +296,7 @@ def decide(did: str, body: DecisionIn, db: Session = Depends(get_db), user: AppU
 
 
 @router.post("/applicability/{did}/reopen", response_model=ResponseWrapper[dict])
-def reopen(did: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def reopen(did: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_UPDATE)):
     """REVIEW_REQUIRED → draf baru IN_ASSESSMENT. Keputusan lama tetap catatan resmi sampai draf baru disetujui."""
     old = _decision(db, did, {"REVIEW_REQUIRED"})
     p = db.get(OrganisationProfile, old.profile_id)

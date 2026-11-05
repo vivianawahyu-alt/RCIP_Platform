@@ -86,7 +86,7 @@ function FindingDetail({ id, ctx, onChange }: { id: string; ctx: Ctx; onChange: 
   const canPlan = can(role, "action_create") && !["CLOSED", "RISK_ACCEPTED", "PENDING_CLOSURE_VALIDATION"].includes(f.state);
   const live = f.actions.filter(a => a.state !== "CANCELLED");
   const allDone = live.length > 0 && live.every(a => a.state === "DONE");
-  const canSubmit = (officer || f.owner_id === me) && ["IN_REMEDIATION", "ACTION_PLANNED"].includes(f.state) && allDone;
+  const canSubmit = can(role, "closure_propose") && ["IN_REMEDIATION", "ACTION_PLANNED"].includes(f.state) && allDone;
   const ownsAction = f.actions.some(a => a.owner_id === me);
   const late = f.target_closure_date && f.target_closure_date < new Date().toISOString().slice(0, 10);
   const people = (users || []).filter(u => ["BUSINESS_CONTROL_OWNER", "COMPLIANCE_OFFICER", "COMPLIANCE_MANAGER"].includes(u.role));

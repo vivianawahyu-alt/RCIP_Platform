@@ -15,7 +15,7 @@ export function Keberlakuan({ ctx }: { ctx: Ctx }) {
   const [rows, reload] = useLoad<any[]>(() => api("/compliance/applicability"), [], ctx.notify);
   const [filter, setFilter] = useState("AKTIF");
   const [showNew, setShowNew] = useState(false);
-  const officer = can(ctx.me.role, "obligation_validate");
+  const officer = can(ctx.me.role, "applicability_create");
   const shown = (rows || []).filter(d => filter === "SEMUA" || (filter === "AKTIF" ? d.state !== "SUPERSEDED" : d.state === filter));
   return <>
     <PageHead crumbs="Kepatuhan" title="Keberlakuan" intro="Apakah sebuah peraturan mengikat organisasi? Saran aturan hanya titik awal; Pejabat Kepatuhan menyusun keputusan bersitasi, Manajer Kepatuhan menyetujui (titik kendali 2). Ekstraksi kewajiban hanya untuk versi dengan keputusan berlaku yang disetujui.">
@@ -37,7 +37,7 @@ function Profile({ ctx, onChange }: { ctx: Ctx; onChange: () => void }) {
   if (!p) return null;
   return <section className="panel"><div className="between"><div><h2>{p.organisation_name}</h2>
     <p className="muted small" style={{ margin: "2px 0 0" }}>Profil v{p.version} · entitas {p.entity_type} · izin: {p.licenses.join(", ")} · lini: {p.business_lines.join(", ")}</p></div>
-    {can(ctx.me.role, "obligation_validate") && <button className="btn sm" onClick={() => { setEdit(!edit); setLic(p.licenses.join(", ")); }}>{edit ? "Batal" : "Ubah profil"}</button>}</div>
+    {can(ctx.me.role, "profile_update") && <button className="btn sm" onClick={() => { setEdit(!edit); setLic(p.licenses.join(", ")); }}>{edit ? "Batal" : "Ubah profil"}</button>}</div>
     {edit && <div className="form" style={{ marginTop: 10 }}>
       <label className="field">Izin (pisahkan dengan koma)<input value={lic} onChange={e => setLic(e.target.value)} /></label>
       <label className="field">Justifikasi<input value={why} onChange={e => setWhy(e.target.value)} /></label>

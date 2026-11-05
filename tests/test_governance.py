@@ -112,7 +112,8 @@ def test_runtime_config_is_admin_only_bounded_and_audited(client):
         client.put(f"{P}/config/remediation.window_days.HIGH", headers=admin, json={"value": 60, "justification": "Kembalikan default"})
     ev = client.get(f"{P}/audit?action=CONFIG_CHANGED&limit=5", headers=auditor).json()["data"]
     assert ev and ev[0]["before"]["key"] == "remediation.window_days.HIGH"
-    keys = [c["key"] for c in client.get(f"{P}/config", headers=o).json()["data"]]
+    assert client.get(f"{P}/config", headers=o).status_code == 403  # Konfigurasi sistem: hanya Auditor (R) dan Administrator
+    keys = [c["key"] for c in client.get(f"{P}/config", headers=auditor).json()["data"]]
     assert not any("audit" in k or "sod" in k or "ai_label" in k for k in keys), "TC-GOV-11: tidak ada kunci untuk mematikan kontrol"
 
 

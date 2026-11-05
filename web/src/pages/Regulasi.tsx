@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
+import { canDo } from "../permissions";
 import { api } from "../api";
 import type { Doc } from "../types";
 import type { Ctx } from "../ui";
@@ -85,7 +86,7 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
               {analyst && v.state !== "PUBLISHED" && v.state !== "WITHDRAWN" && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/versions/${v.id}/publish`, { method: "POST" }), `Versi ${v.version_number} dipublikasikan dan dibekukan.`)}>Publikasikan</button>}
             </span>)}</div>
             {/* Tombol Hapus/Tarik versi & Hapus dokumen (khusus Analis); kosongkan pilihan bila versi yang dibuka ikut terhapus */}
-            {analyst && <CorpusActions doc={d} busy={busy} run={run} onRemoved={id => { if (d.versions.some(v => v.id === sel) && (id === d.id || id === sel)) setSel(""); }} />}
+            {analyst && <CorpusActions role={ctx.me.role} doc={d} busy={busy} run={run} onRemoved={id => { if (d.versions.some(v => v.id === sel) && (id === d.id || id === sel)) setSel(""); }} />}
             {analyst && <label className="field" style={{ marginTop: 10 }}>Unggah versi baru (.pdf/.txt)<input type="file" accept=".pdf,.txt" onChange={e => upload(e, d.id)} /></label>}
           </li>)}</ul> : <Empty>Belum ada dokumen.</Empty>}
         </section>
@@ -149,7 +150,7 @@ function ProvItem({ p, draft, analyst, canExtract, busy, run, extract, onSaved }
 
 /** Hapus versi draf / dokumen yang belum pernah terbit; tarik (bukan hapus) versi yang sudah terbit.
  *  Konfirmasi dua langkah di dalam halaman agar tidak terhapus karena salah klik. */
-function CorpusActions({ doc, busy, run, onRemoved }: { doc: Doc; busy: boolean; run: Run; onRemoved: (id: string) => void }) {
+function CorpusActions({ doc, busy, run, onRemoved, role }: { doc: Doc; busy: boolean; run: Run; onRemoved: (id: string) => void; role: string }) {
   // Aksi yang sedang menunggu konfirmasi (null = belum ada yang diklik)
   const [pending, setPending] = useState<{ kind: "version" | "withdraw" | "document"; id: string; label: string } | null>(null);
   // Alasan penarikan (wajib untuk "Tarik versi")
@@ -168,9 +169,9 @@ function CorpusActions({ doc, busy, run, onRemoved }: { doc: Doc; busy: boolean;
     {/* Tahap 1: tombol aksi. Versi terbit → "Tarik", versi draf → "Hapus" */}
     {!pending && <div className="row" style={{ gap: 4 }}>
       {doc.versions.map(v => v.state === "WITHDRAWN" ? null : v.state === "PUBLISHED"
-        ? <button key={v.id} className="btn sm ghost" disabled={busy} onClick={() => setPending({ kind: "withdraw", id: v.id, label: `Versi ${v.version_number}` })}>Tarik v{v.version_number}</button>
+        ? !canDo(role, "doc_status", "U") ? null : <button key={v.id} className="btn sm ghost" disabled={busy} onClick={() => setPending({ kind: "withdraw", id: v.id, label: `Versi ${v.version_number}` })}>Tarik v{v.version_number}</button>
         : <button key={v.id} className="btn sm ghost danger-text" disabled={busy} onClick={() => setPending({ kind: "version", id: v.id, label: `Versi ${v.version_number}` })}>Hapus v{v.version_number}</button>)}
-      {!everPublished && <button className="btn sm ghost danger-text" disabled={busy} onClick={() => setPending({ kind: "document", id: doc.id, label: doc.canonical_number })}>Hapus dokumen</button>}
+      {!everPublished && canDo(role, "source_registry", "D") && <button className="btn sm ghost danger-text" disabled={busy} onClick={() => setPending({ kind: "document", id: doc.id, label: doc.canonical_number })}>Hapus dokumen</button>}
     </div>}
     {/* Tahap 2: kotak konfirmasi agar tidak terhapus karena salah klik */}
     {pending && <div className="decision" style={{ marginTop: 6 }}>
@@ -268,28 +269,35 @@ function ChangeItem({ c, ctx, onDone }: { c: any; ctx: Ctx; onDone: () => void }
 }
 
 function DocGovernance({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ctx: Ctx; onChange: () => void }) {
-  const [labels, reloadL] = useLoad<any[]>(() => api(`/corpus/documents/${doc.id}/labels`), [doc.id], ctx.notify);
-  const [rels, reloadR] = useLoad<any[]>(() => api(`/corpus/relationships?document_id=${doc.id}`), [doc.id], ctx.notify);
+  // Taxonomy Label dan Relasi regulasi punya hak baca sendiri di tabel: hanya dimuat bila peran berhak membacanya
+  const canLab = canDo(ctx.me.role, "taxonomy", "R"), canRel = canDo(ctx.me.role, "relationship", "R");
+  const [labels, reloadL] = useLoad<any[]>(() => canLab ? api(`/corpus/documents/${doc.id}/labels`) : Promise.resolve([]), [doc.id], ctx.notify);
+  const [rels, reloadR] = useLoad<any[]>(() => canRel ? api(`/corpus/relationships?document_id=${doc.id}`) : Promise.resolve([]), [doc.id], ctx.notify);
   const [rf, setRf] = useState({ target_document_id: "", relation_type: "AMENDS", citing: "" });
   const [provs, setProvs] = useState<Prov[]>([]);
   useEffect(() => { const v = doc.versions[doc.versions.length - 1]; if (v) api<Prov[]>(`/corpus/versions/${v.id}/provisions`).then(setProvs).catch(() => setProvs([])); }, [doc.id]);
   const { run, busy } = useAction(ctx.notify, () => { reloadL(); reloadR(); onChange(); });
-  const analyst = can(ctx.me.role, "corpus_write"), manager = ctx.me.role === "COMPLIANCE_MANAGER";
+  const analyst = canDo(ctx.me.role, "taxonomy", "U"), manager = ctx.me.role === "COMPLIANCE_MANAGER";
+  const canAddRel = canDo(ctx.me.role, "relationship", "C");
+  if (!canLab && !canRel) return null;  // peran tanpa hak baca label maupun relasi tidak melihat panel ini sama sekali
   return <section className="panel"><h2>Klasifikasi & silsilah</h2>
+    {canLab && <>
     <p className="muted small" style={{ marginTop: 2 }}>Label dari taksonomi terkendali; saran aturan perlu dikonfirmasi analis.</p>
     {labels?.length ? <ul className="list">{labels.map(l => <li key={l.id} className="between"><span className="small"><b>{l.value}</b> <span className="muted">{l.dimension}</span></span>
       <span className="row"><Status s={l.state === "SUGGESTED" ? "SUBMITTED" : l.state === "CONFIRMED" ? "ACCEPTED" : "REJECTED"} />
         {analyst && l.state === "SUGGESTED" && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/labels/${l.id}/confirm`, { method: "POST" }), "Label dikonfirmasi.")}>Konfirmasi</button>}
-        {analyst && l.state !== "REMOVED" && <button className="btn sm ghost" disabled={busy} onClick={() => run(() => api(`/corpus/labels/${l.id}/remove`, { body: { reason: "Tidak sesuai isi dokumen" } }), "Label dihapus dengan alasan.")}>Hapus</button>}</span></li>)}</ul> : <p className="small muted">Belum ada label.</p>}
+        {canDo(ctx.me.role, "taxonomy", "D") && l.state !== "REMOVED" && <button className="btn sm ghost" disabled={busy} onClick={() => run(() => api(`/corpus/labels/${l.id}/remove`, { body: { reason: "Tidak sesuai isi dokumen" } }), "Label dihapus dengan alasan.")}>Hapus</button>}</span></li>)}</ul> : <p className="small muted">Belum ada label.</p>}
+    </>}
+    {canRel && <>
     <h3 style={{ fontSize: 16, marginTop: 14 }}>Relasi dokumen</h3>
     {rels?.length ? <ul className="list">{rels.map(r => <li key={r.id} className="between"><span className="small">{r.source} <b>{r.relation_type}</b> {r.target}</span>
       <span className="row"><Status s={r.state === "PROPOSED" ? "SUBMITTED" : r.state === "CONFIRMED" ? "ACCEPTED" : "REJECTED"} />
-        {(analyst || manager) && r.state === "PROPOSED" && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/relationships/${r.id}/confirm`, { method: "POST" }), "Relasi dikonfirmasi; status dokumen target diperbarui.")}>Konfirmasi</button>}</span></li>)}</ul> : <p className="small muted">Belum ada relasi.</p>}
-    {analyst && <div className="form" style={{ marginTop: 8 }}>
+        {manager && r.state === "PROPOSED" && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/relationships/${r.id}/confirm`, { method: "POST" }), "Relasi dikonfirmasi; status dokumen target diperbarui.")}>Konfirmasi</button>}</span></li>)}</ul> : <p className="small muted">Belum ada relasi.</p>}
+    {canAddRel && <div className="form" style={{ marginTop: 8 }}>
       <div className="form-2"><label className="field">Dokumen ini…<select value={rf.relation_type} onChange={e => setRf({ ...rf, relation_type: e.target.value })}>{["AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"].map(x => <option key={x}>{x}</option>)}</select></label>
         <label className="field">Dokumen target<select value={rf.target_document_id} onChange={e => setRf({ ...rf, target_document_id: e.target.value })}><option value="">Pilih</option>{docs.filter(d => d.id !== doc.id).map(d => <option key={d.id} value={d.id}>{d.canonical_number}</option>)}</select></label></div>
       <label className="field">Pasal penetap (wajib untuk konfirmasi)<select value={rf.citing} onChange={e => setRf({ ...rf, citing: e.target.value })}><option value="">Pilih pasal</option>{provs.map(p => <option key={p.provision_version_id} value={p.provision_version_id}>{p.number_label}</option>)}</select></label>
       <div><button className="btn" disabled={busy || !rf.target_document_id} onClick={() => run(() => api("/corpus/relationships", { body: { source_document_id: doc.id, target_document_id: rf.target_document_id, relation_type: rf.relation_type, citing_provision_version_id: rf.citing || null } }), "Relasi diusulkan.")}>Usulkan relasi</button></div>
     </div>}
-  </section>;
-}
+    </>}
+  </section>};

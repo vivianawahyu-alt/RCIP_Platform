@@ -11,9 +11,10 @@ from uuid import uuid4
 
 from app.corpus import services
 from app.corpus.models import ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, TaxonomyLabel
-from app.platform.auth import current_user, require_roles
+from app.platform.auth import current_user
 from app.platform.governance import audit
 from app.platform.models import AppUser
+from app.platform.permissions import allows, require, require_any
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import CitationResolveRequest, CitationResolveResponse, ResponseWrapper
@@ -21,7 +22,7 @@ from app.shared.storage import put_object
 from app.shared.vocabularies import AppRole, VersionState
 
 router = APIRouter(tags=["corpus"])
-ANALYST = require_roles(AppRole.REGULATORY_ANALYST)
+# Otorisasi memakai matriks RBAC (app/shared/rbac_matrix.py): tiap endpoint menyebut kapabilitas + huruf aksi tabel.
 
 
 class DocumentCreate(BaseModel):
@@ -67,7 +68,8 @@ def resolve(payload: CitationResolveRequest, db: Session = Depends(get_db), _: A
 
 
 @router.post("/api/v1/corpus/documents", response_model=ResponseWrapper[dict])
-def create_document(body: DocumentCreate, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def create_document(body: DocumentCreate, db: Session = Depends(get_db),
+                    user: AppUser = Depends(require("source_registry", "C"))):  # Registri Regulatory Source: C = RA, Admin
     if db.scalar(select(Document).where(Document.canonical_number == body.canonical_number)):
         raise AppError(409, "DUPLICATE", "Nomor regulasi sudah terdaftar")
     src = services.get_or_create_source(db, body.source_category, body.source_category, body.issuer, body.base_url)
@@ -84,7 +86,9 @@ def create_document(body: DocumentCreate, db: Session = Depends(get_db), user: A
 
 
 @router.get("/api/v1/corpus/documents", response_model=ResponseWrapper[list])
-def list_documents(db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_documents(db: Session = Depends(get_db),
+                   user: AppUser = Depends(require_any(("source_registry", "R"), ("document_version", "R")))):
+    # Registri sumber + Document Version: dapat dibaca semua peran kecuali Pemilik Bisnis/Kontrol (yang memakai Pencarian korpus)
     out = []
         # urutkan dari dokumen yang paling baru didaftarkan; bila waktunya sama, urut nomor regulasi
     for d in db.scalars(select(Document).order_by(Document.created_at.desc(), Document.canonical_number)):
@@ -92,7 +96,8 @@ def list_documents(db: Session = Depends(get_db), _: AppUser = Depends(current_u
                         .order_by(DocumentVersion.version_number)).all()
         labels = [{"dimension": lb.dimension, "value": lb.value, "state": lb.state}
                   for lb in db.scalars(select(TaxonomyLabel).where(TaxonomyLabel.document_id == d.id,
-                                                                   TaxonomyLabel.state != "REMOVED"))]
+                                                                   TaxonomyLabel.state != "REMOVED"))
+                  ] if allows(user, "taxonomy", "R") else []  # label hanya untuk peran yang berhak membaca Taxonomy
         out.append({"id": str(d.id), "canonical_number": d.canonical_number, "title_id": d.title_id,
                     "status": d.status, "instrument_type": d.instrument_type, "issuer": d.issuer, "labels": labels,
                     "versions": [{"id": str(v.id), "version_number": v.version_number, "state": v.state,
@@ -110,7 +115,7 @@ async def upload_version(
     effective_date: date = Form(...),
     origin_url: str = Form("upload://manual"),
     db: Session = Depends(get_db),
-    user: AppUser = Depends(ANALYST)
+    user: AppUser = Depends(require("ingestion", "X"))  # Ingestion dokumen: X = Analis Regulasi, Administrator Sistem
 ):
     doc = _get(db, Document, doc_id)
 
@@ -217,7 +222,8 @@ async def upload_version(
 
 
 @router.get("/api/v1/corpus/versions/{version_id}/provisions", response_model=ResponseWrapper[list])
-def list_provisions(version_id: str, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_provisions(version_id: str, db: Session = Depends(get_db),
+                    _: AppUser = Depends(require("document_version", "R"))):
     _get(db, DocumentVersion, version_id)
     rows = db.execute(select(ProvisionVersion, Provision)
                       .join(Provision, Provision.id == ProvisionVersion.provision_id)
@@ -233,7 +239,7 @@ def list_provisions(version_id: str, db: Session = Depends(get_db), _: AppUser =
 
 @router.patch("/api/v1/corpus/provision-versions/{pv_id}", response_model=ResponseWrapper[dict])
 def correct_provision(pv_id: str, body: ProvisionCorrection, db: Session = Depends(get_db),
-                      user: AppUser = Depends(ANALYST)):
+                      user: AppUser = Depends(require("provision_correction", "U"))):  # Koreksi segmentasi: U = Analis
     pv = _get(db, ProvisionVersion, pv_id)
     dv = db.get(DocumentVersion, pv.document_version_id)
     if dv.state not in (VersionState.SEGMENTED_DRAFT.value, VersionState.UNDER_CORRECTION.value):
@@ -253,7 +259,8 @@ def correct_provision(pv_id: str, body: ProvisionCorrection, db: Session = Depen
 
 # [6e] ENDPOINT BARU: tombol "Konfirmasi teks" di UI memanggil endpoint ini (khusus Analis)
 @router.post("/api/v1/corpus/provision-versions/{pv_id}/confirm-text", response_model=ResponseWrapper[dict])
-def confirm_text(pv_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def confirm_text(pv_id: str, db: Session = Depends(get_db),
+                 user: AppUser = Depends(require("provision_correction", "U"))):
     """FR-RKM-004: analis menyatakan teks hasil OCR sudah sesuai PDF aslinya (tanpa mengubah teks)."""
     pv = _get(db, ProvisionVersion, pv_id)              # pasal yang dikonfirmasi (404 bila tidak ada)
     dv = db.get(DocumentVersion, pv.document_version_id)  # versi dokumennya
@@ -272,7 +279,8 @@ def confirm_text(pv_id: str, db: Session = Depends(get_db), user: AppUser = Depe
 
 
 @router.post("/api/v1/corpus/versions/{version_id}/publish", response_model=ResponseWrapper[dict])
-def publish(version_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def publish(version_id: str, db: Session = Depends(get_db),
+            user: AppUser = Depends(require("document_version", "C"))):  # menerbitkan = membuat Document Version imutabel
     dv = _get(db, DocumentVersion, version_id)
     services.publish_version(db, dv)
     audit(db, user.id, "VERSION_PUBLISHED", "document_version", dv.id)
@@ -282,12 +290,14 @@ def publish(version_id: str, db: Session = Depends(get_db), user: AppUser = Depe
 
 
 @router.get("/api/v1/corpus/search", response_model=ResponseWrapper[list])
-def search(q: str, limit: int = 10, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def search(q: str, limit: int = 10, db: Session = Depends(get_db),
+           _: AppUser = Depends(require("corpus_search", "R"))):  # Pencarian korpus: semua peran
     return ResponseWrapper(data=services.search_provisions(db, q, min(limit, 50)))
 
 
 @router.post("/api/v1/corpus/changes", response_model=ResponseWrapper[dict])
-def compute(body: ChangeRequest, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def compute(body: ChangeRequest, db: Session = Depends(get_db),
+            user: AppUser = Depends(require("change_detection", "X"))):  # Eksekusi deteksi perubahan: X = Analis, Admin
     base, new = _get(db, DocumentVersion, body.base_version_id), _get(db, DocumentVersion, body.new_version_id)
     if base.state != "PUBLISHED" or new.state != "PUBLISHED":
         raise AppError(409, "VERSION_NOT_PUBLISHED", "Kedua versi harus berstatus PUBLISHED (W5)")
@@ -351,7 +361,8 @@ def _delete_draft_version(db: Session, dv: DocumentVersion) -> int:
 
 
 @router.delete("/api/v1/corpus/versions/{version_id}", response_model=ResponseWrapper[dict])
-def delete_version(version_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def delete_version(version_id: str, db: Session = Depends(get_db),
+                   user: AppUser = Depends(require("ingestion", "X"))):  # membatalkan ingestion draf = aksi X pada Ingestion
     """Hanya versi DRAF yang dapat dihapus. Versi terbit imutabel (trigger DB) → gunakan 'tarik versi'."""
     dv = _get(db, DocumentVersion, version_id)
     # 1) versi terbit/ditarik dikunci trigger DB → tolak
@@ -376,7 +387,7 @@ def delete_version(version_id: str, db: Session = Depends(get_db), user: AppUser
 
 @router.post("/api/v1/corpus/versions/{version_id}/withdraw", response_model=ResponseWrapper[dict])
 def withdraw_version(version_id: str, body: WithdrawRequest, db: Session = Depends(get_db),
-                     user: AppUser = Depends(ANALYST)):
+                     user: AppUser = Depends(require("doc_status", "U"))):  # Perubahan status dokumen: U = Analis
     """Versi terbit ditarik (WITHDRAWN), bukan dihapus: tidak lagi dipakai pencarian/copilot/ekstraksi,
     tetapi teks dan jejaknya tetap tersimpan. Diblokir bila masih ada kewajiban yang menyitasinya."""
     dv = _get(db, DocumentVersion, version_id)
@@ -402,7 +413,8 @@ def withdraw_version(version_id: str, body: WithdrawRequest, db: Session = Depen
 
 
 @router.delete("/api/v1/corpus/documents/{doc_id}", response_model=ResponseWrapper[dict])
-def delete_document(doc_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def delete_document(doc_id: str, db: Session = Depends(get_db),
+                    user: AppUser = Depends(require("source_registry", "D"))):  # D hanya Administrator Sistem
     """Dokumen hanya dapat dihapus bila belum pernah terbit (semua versinya draf) dan tidak dirujuk relasi."""
     from app.corpus.models import Relationship
     doc = _get(db, Document, doc_id)

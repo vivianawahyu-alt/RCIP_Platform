@@ -15,9 +15,9 @@ from app.compliance.common import get_or_404, iso, now, require_text, sid, user_
 from app.compliance.models import ApplicabilityDecision, Control, Obligation, ObligationControlMap
 from app.corpus.models import (Change, ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, Relationship,
                                TaxonomyLabel)
-from app.platform.auth import require_roles
-from app.platform.governance import audit, record_approval
+from app.platform.governance import audit, enforce_maker_checker, record_approval
 from app.platform.models import AppUser, Outbox
+from app.platform.permissions import require
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import ResponseWrapper
@@ -25,11 +25,21 @@ from app.shared.vocabularies import AppRole, ControlPoint
 
 router = APIRouter(prefix="/api/v1/corpus", tags=["corpus-review"])
 R = AppRole
-ANALYST = require_roles(R.REGULATORY_ANALYST)
-MANAGER = require_roles(R.COMPLIANCE_MANAGER)
-LEGAL = require_roles(R.LEGAL_REVIEWER)
-READERS = require_roles(R.REGULATORY_ANALYST, R.COMPLIANCE_OFFICER, R.LEGAL_REVIEWER, R.COMPLIANCE_MANAGER,
-                        R.INTERNAL_AUDITOR, R.EXECUTIVE, R.BUSINESS_CONTROL_OWNER, R.SYSTEM_ADMINISTRATOR)
+# Otorisasi = matriks RBAC (app/shared/rbac_matrix.py). Nama di bawah hanya pintasan agar baris endpoint tetap pendek.
+CHANGE_READ = require("change_review", "R")              # RA, CO, LR, CM, IA   (Pemilik Kontrol, Eksekutif, Admin: tanpa akses)
+# validasi/eskalasi = aksi U pada Tinjauan Change; dipersempit ke Analis & Pejabat (maker). Peninjau Hukum memakai U lewat legal-answer.
+CHANGE_MAKER = require("change_review", "U", only=[R.REGULATORY_ANALYST, R.COMPLIANCE_OFFICER])
+CHANGE_LEGAL = require("change_review", "U", only=[R.LEGAL_REVIEWER])
+CHANGE_APPROVE = require("change_review", "A")           # Manajer Kepatuhan (titik kendali #1)
+REL_READ = require("relationship", "R")
+REL_CREATE = require("relationship", "C")
+REL_UPDATE = require("relationship", "U")
+REL_DELETE = require("relationship", "D")
+STATUS_APPROVE = require("doc_status", "A")              # konfirmasi relasi = mengubah status dokumen → persetujuan Manajer
+TAX_READ = require("taxonomy", "R")
+TAX_WRITE = require("taxonomy", "C")                     # RA, CO, Admin
+TAX_UPDATE = require("taxonomy", "U")
+TAX_DELETE = require("taxonomy", "D")                    # hapus lunak label: hanya Administrator Sistem
 
 SEMANTIC_TYPES = {"DEFINITION_CHANGED", "OBLIGATION_ADDED", "OBLIGATION_REMOVED", "OBLIGATION_MODIFIED",
                   "DEADLINE_CHANGED", "THRESHOLD_CHANGED", "SCOPE_CHANGED", "SANCTION_CHANGED",
@@ -100,7 +110,7 @@ def _change_dto(c: Change, label: str, names: dict) -> dict:
 
 
 @router.get("/changesets", response_model=ResponseWrapper[list])
-def list_changesets(db: Session = Depends(get_db), _: AppUser = Depends(READERS)):
+def list_changesets(db: Session = Depends(get_db), _: AppUser = Depends(CHANGE_READ)):
     out = []
     for cs in db.scalars(select(ChangeSet).order_by(ChangeSet.created_at.desc())):
         bv, nv = db.get(DocumentVersion, cs.base_version_id), db.get(DocumentVersion, cs.new_version_id)
@@ -116,7 +126,7 @@ def list_changesets(db: Session = Depends(get_db), _: AppUser = Depends(READERS)
 
 
 @router.get("/changesets/{cs_id}", response_model=ResponseWrapper[dict])
-def get_changeset(cs_id: str, db: Session = Depends(get_db), _: AppUser = Depends(READERS)):
+def get_changeset(cs_id: str, db: Session = Depends(get_db), _: AppUser = Depends(CHANGE_READ)):
     cs = get_or_404(db, ChangeSet, cs_id)
     names = user_names(db)
     nv = db.get(DocumentVersion, cs.new_version_id)
@@ -137,7 +147,7 @@ def _change(db: Session, cid: str, allowed: set[str]) -> Change:
 
 
 @router.post("/changes/{cid}/validate", response_model=ResponseWrapper[dict])
-def validate_change(cid: str, body: ValidateChangeIn, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def validate_change(cid: str, body: ValidateChangeIn, db: Session = Depends(get_db), user: AppUser = Depends(CHANGE_MAKER)):
     c = _change(db, cid, {"DETECTED", "IN_REVIEW"})
     reason = require_text(body.reason, "reason")
     if body.semantic_type and body.semantic_type not in SEMANTIC_TYPES:
@@ -155,7 +165,7 @@ def validate_change(cid: str, body: ValidateChangeIn, db: Session = Depends(get_
 
 
 @router.post("/changes/{cid}/escalate", response_model=ResponseWrapper[dict])
-def escalate_change(cid: str, body: QuestionIn, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def escalate_change(cid: str, body: QuestionIn, db: Session = Depends(get_db), user: AppUser = Depends(CHANGE_MAKER)):
     c = _change(db, cid, {"DETECTED", "IN_REVIEW"})
     c.legal_question, c.review_state = require_text(body.question, "question"), "ESCALATED"
     audit(db, user.id, "CHANGE_ESCALATED", "change", c.id, after={"question": c.legal_question})
@@ -164,7 +174,7 @@ def escalate_change(cid: str, body: QuestionIn, db: Session = Depends(get_db), u
 
 
 @router.post("/changes/{cid}/legal-answer", response_model=ResponseWrapper[dict])
-def answer_change(cid: str, body: AnswerIn, db: Session = Depends(get_db), user: AppUser = Depends(LEGAL)):
+def answer_change(cid: str, body: AnswerIn, db: Session = Depends(get_db), user: AppUser = Depends(CHANGE_LEGAL)):
     c = _change(db, cid, {"ESCALATED"})
     c.legal_answer, c.review_state = require_text(body.answer, "answer"), "IN_REVIEW"
     audit(db, user.id, "CHANGE_LEGAL_POSITION", "change", c.id, after={"answer": c.legal_answer})
@@ -211,7 +221,7 @@ def propagate_material_change(db: Session, c: Change, actor_id) -> dict:
 
 
 @router.post("/changes/{cid}/confirm-materiality", response_model=ResponseWrapper[dict])
-def confirm_materiality(cid: str, body: DecisionIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def confirm_materiality(cid: str, body: DecisionIn, db: Session = Depends(get_db), user: AppUser = Depends(CHANGE_APPROVE)):
     """Titik kendali #1: konfirmasi materialitas oleh Manajer Kepatuhan (≠ analis validator)."""
     c = _change(db, cid, {"VALIDATED"})
     if body.outcome not in ("APPROVED", "REJECTED"):
@@ -236,7 +246,7 @@ def confirm_materiality(cid: str, body: DecisionIn, db: Session = Depends(get_db
 
 # ---------- W4 ----------
 @router.get("/relationships", response_model=ResponseWrapper[list])
-def list_relationships(document_id: Optional[str] = None, db: Session = Depends(get_db), _: AppUser = Depends(READERS)):
+def list_relationships(document_id: Optional[str] = None, db: Session = Depends(get_db), _: AppUser = Depends(REL_READ)):
     names = user_names(db)
     docs = {str(d.id): d.canonical_number for d in db.scalars(select(Document))}
     stmt = select(Relationship).order_by(Relationship.created_at.desc())
@@ -253,7 +263,7 @@ def list_relationships(document_id: Optional[str] = None, db: Session = Depends(
 
 
 @router.post("/relationships", response_model=ResponseWrapper[dict])
-def propose_relationship(body: RelationshipIn, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def propose_relationship(body: RelationshipIn, db: Session = Depends(get_db), user: AppUser = Depends(REL_CREATE)):
     get_or_404(db, Document, body.source_document_id)
     get_or_404(db, Document, body.target_document_id)
     if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
@@ -270,12 +280,55 @@ def propose_relationship(body: RelationshipIn, db: Session = Depends(get_db), us
     return ResponseWrapper(data={"id": str(r.id), "state": r.state})
 
 
+class RelationshipUpdateIn(BaseModel):
+    relation_type: Optional[str] = None
+    citing_provision_version_id: Optional[str] = None
+    note: Optional[str] = None
+
+
+@router.patch("/relationships/{rid}", response_model=ResponseWrapper[dict])
+def update_relationship(rid: str, body: RelationshipUpdateIn, db: Session = Depends(get_db),
+                        user: AppUser = Depends(REL_UPDATE)):
+    """Relasi regulasi: U = Analis & Peninjau Hukum. Hanya relasi yang masih PROPOSED yang dapat disunting."""
+    r = get_or_404(db, Relationship, rid)
+    if r.state != "PROPOSED":
+        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya PROPOSED yang dapat disunting")
+    before = {"relation_type": r.relation_type, "note": r.note, "citing": sid(r.citing_provision_version_id)}
+    if body.relation_type is not None:
+        if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
+            raise AppError(422, "BAD_RELATION_TYPE", "relation_type tidak dikenal")
+        r.relation_type = body.relation_type
+    if body.citing_provision_version_id is not None:
+        r.citing_provision_version_id = body.citing_provision_version_id or None
+    if body.note is not None:
+        r.note = body.note
+    audit(db, user.id, "RELATIONSHIP_UPDATED", "relationship", r.id, before=before,
+          after={"relation_type": r.relation_type, "note": r.note, "citing": sid(r.citing_provision_version_id)})
+    db.commit()
+    return ResponseWrapper(data={"id": str(r.id), "state": r.state})
+
+
+@router.delete("/relationships/{rid}", response_model=ResponseWrapper[dict])
+def delete_relationship(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(REL_DELETE)):
+    """Relasi regulasi: D = Analis. Hanya usulan (PROPOSED); relasi CONFIRMED sudah mengubah status dokumen → tidak boleh hilang."""
+    r = get_or_404(db, Relationship, rid)
+    if r.state != "PROPOSED":
+        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya usulan (PROPOSED) yang dapat dihapus")
+    audit(db, user.id, "RELATIONSHIP_DELETED", "relationship", r.id,
+          before={"source": str(r.source_document_id), "target": str(r.target_document_id), "type": r.relation_type})
+    db.delete(r)
+    db.commit()
+    return ResponseWrapper(data={"deleted_relationship_id": rid})
+
+
 @router.post("/relationships/{rid}/confirm", response_model=ResponseWrapper[dict])
-def confirm_relationship(rid: str, db: Session = Depends(get_db),
-                         user: AppUser = Depends(require_roles(R.REGULATORY_ANALYST, R.COMPLIANCE_MANAGER))):
+def confirm_relationship(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(STATUS_APPROVE)):
+    """Konfirmasi relasi mengubah status dokumen (mis. REVOKED) → persetujuan Manajer Kepatuhan (baris
+    'Perubahan status dokumen': Analis C/R/U, Manajer R/A). Pengonfirmasi tidak boleh sama dengan pengusul."""
     r = get_or_404(db, Relationship, rid)
     if r.state != "PROPOSED":
         raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}")
+    enforce_maker_checker(user.id, r.proposed_by)
     if not r.citing_provision_version_id:
         raise AppError(422, "CITATION_REQUIRED", "Konfirmasi relasi wajib menyitasi ketentuan penetap (pasal penutup)")
     r.state, r.confirmed_by = "CONFIRMED", user.id
@@ -308,7 +361,7 @@ def suggest_labels(db: Session, doc: Document) -> list[TaxonomyLabel]:
 
 
 @router.get("/documents/{doc_id}/labels", response_model=ResponseWrapper[list])
-def list_labels(doc_id: str, db: Session = Depends(get_db), _: AppUser = Depends(READERS)):
+def list_labels(doc_id: str, db: Session = Depends(get_db), _: AppUser = Depends(TAX_READ)):
     return ResponseWrapper(data=[{"id": str(lb.id), "dimension": lb.dimension, "value": lb.value, "state": lb.state,
                                   "source": lb.source, "reason": lb.reason}
                                  for lb in db.scalars(select(TaxonomyLabel).where(TaxonomyLabel.document_id == doc_id)
@@ -316,7 +369,7 @@ def list_labels(doc_id: str, db: Session = Depends(get_db), _: AppUser = Depends
 
 
 @router.post("/documents/{doc_id}/labels/suggest", response_model=ResponseWrapper[dict])
-def suggest(doc_id: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def suggest(doc_id: str, db: Session = Depends(get_db), user: AppUser = Depends(TAX_WRITE)):
     doc = get_or_404(db, Document, doc_id)
     created = suggest_labels(db, doc)
     audit(db, user.id, "LABELS_SUGGESTED", "document", doc.id, after={"count": len(created)})
@@ -325,7 +378,7 @@ def suggest(doc_id: str, db: Session = Depends(get_db), user: AppUser = Depends(
 
 
 @router.post("/documents/{doc_id}/labels", response_model=ResponseWrapper[dict])
-def add_label(doc_id: str, body: LabelIn, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def add_label(doc_id: str, body: LabelIn, db: Session = Depends(get_db), user: AppUser = Depends(TAX_WRITE)):
     doc = get_or_404(db, Document, doc_id)
     if body.value not in ALLOWED_LABELS.get(body.dimension, set()):
         raise AppError(422, "LABEL_NOT_IN_TAXONOMY", "Label harus berasal dari taksonomi terkendali (E6.1)")
@@ -339,7 +392,7 @@ def add_label(doc_id: str, body: LabelIn, db: Session = Depends(get_db), user: A
 
 
 @router.post("/labels/{lid}/confirm", response_model=ResponseWrapper[dict])
-def confirm_label(lid: str, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def confirm_label(lid: str, db: Session = Depends(get_db), user: AppUser = Depends(TAX_UPDATE)):
     lbl = get_or_404(db, TaxonomyLabel, lid)
     lbl.state, lbl.decided_by = "CONFIRMED", user.id
     audit(db, user.id, "LABEL_CONFIRMED", "taxonomy_label", lbl.id)
@@ -348,7 +401,7 @@ def confirm_label(lid: str, db: Session = Depends(get_db), user: AppUser = Depen
 
 
 @router.post("/labels/{lid}/remove", response_model=ResponseWrapper[dict])
-def remove_label(lid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(ANALYST)):
+def remove_label(lid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(TAX_DELETE)):
     lbl = get_or_404(db, TaxonomyLabel, lid)
     lbl.state, lbl.reason, lbl.decided_by = "REMOVED", require_text(body.reason, "reason"), user.id
     audit(db, user.id, "LABEL_REMOVED", "taxonomy_label", lbl.id, after={"reason": lbl.reason})

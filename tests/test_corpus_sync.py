@@ -96,7 +96,9 @@ def test_deleted_draft_document_is_removed_elsewhere(client, korpus):
     meta = json.loads((folder / "dokumen.json").read_text(encoding="utf-8"))
     meta["canonical_number"] = f"POJK TEST/{tag}/Hapus"
     (folder / "dokumen.json").write_text(json.dumps(meta), encoding="utf-8")
-    assert client.delete(f"{P}/corpus/documents/{doc}", headers=a).status_code == 200
+    # matriks RBAC "Registri Regulatory Source": D (hapus) hanya Administrator Sistem; Analis hanya C/R/U
+    assert client.delete(f"{P}/corpus/documents/{doc}", headers=a).status_code == 403
+    assert client.delete(f"{P}/corpus/documents/{doc}", headers=login(client, "admin")).status_code == 200
     meta = json.loads((folder / "dokumen.json").read_text(encoding="utf-8"))
     assert meta["deleted_at"]
     _as_other_laptop(folder, other)

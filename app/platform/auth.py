@@ -48,6 +48,8 @@ def current_user(cred: HTTPAuthorizationCredentials = Depends(bearer), db: Sessi
         raise AppError(401, "UNAUTHENTICATED", "Token tidak valid atau kedaluwarsa")
     if user is None:
         raise AppError(401, "UNAUTHENTICATED", "Pengguna tidak ditemukan")
+    if not user.is_active:  # akun dinonaktifkan Administrator → token yang sudah terbit pun langsung tidak berlaku
+        raise AppError(401, "UNAUTHENTICATED", "Akun dinonaktifkan")
     return user
 
 

@@ -58,7 +58,10 @@ def test_end_to_end(client):
     assert scan
     # pada DB baru, pemindaian juga memunculkan kesenjangan data seed milik pemilik lain → pilih temuan kewajiban ini
     mine = next(f for f in scan if client.get(f"{P}/compliance/findings/{f}", headers=officer).json()["data"]["obligation"]["id"] == ob)
+    # matriks RBAC "Tindakan remediasi": Pemilik Kontrol hanya R/U/X (own) — membuat tindakan (C) milik Pejabat Kepatuhan
     assert client.post(f"{P}/compliance/findings/{mine}/remediation", headers=owner,
+                       json={"description": "Buat kontrol", "due_date": str(date.today() + timedelta(days=30))}).status_code == 403
+    assert client.post(f"{P}/compliance/findings/{mine}/remediation", headers=officer,
                        json={"description": "Buat kontrol", "due_date": str(date.today() + timedelta(days=30))}).status_code == 200
 
     # 9-11 kontrol, bukti, asesmen
