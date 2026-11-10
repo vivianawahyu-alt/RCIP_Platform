@@ -3,7 +3,7 @@ pemindaian berkas, pembatasan laju login, correlation ID, dan amplop error."""
 import uuid
 from datetime import date
 
-from tests.conftest import P, approve_applicability, login, make_active_obligation, uid
+from tests.conftest import ORIGIN, P, approve_applicability, login, make_active_obligation, uid
 
 
 def _doc_with_two_versions(client, v1, v2, title="Pelaporan Insiden Bank Umum"):
@@ -12,8 +12,9 @@ def _doc_with_two_versions(client, v1, v2, title="Pelaporan Insiden Bank Umum"):
     doc = client.post(f"{P}/corpus/documents", headers=a, json={"canonical_number": number, "title_id": title}).json()["data"]["id"]
     vids = []
     for body in (v1, v2):
-        vid = client.post(f"{P}/corpus/documents/{doc}/versions", headers=a, files={"file": ("t.txt", body.encode())},
-                          data={"effective_date": str(date.today())}).json()["data"]["version_id"]
+        unique = f"Dokumen uji {uuid.uuid4().hex}\n{body}"  # pembuka unik → lolos cek duplikat berkas
+        vid = client.post(f"{P}/corpus/documents/{doc}/versions", headers=a, files={"file": ("t.txt", unique.encode())},
+                          data={"effective_date": str(date.today()), "origin_url": ORIGIN}).json()["data"]["version_id"]
         client.post(f"{P}/corpus/versions/{vid}/publish", headers=a)
         vids.append(vid)
     return doc, vids

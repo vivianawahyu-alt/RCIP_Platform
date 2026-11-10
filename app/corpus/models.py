@@ -2,7 +2,7 @@ import uuid
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, Computed, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, Boolean, Column, Computed, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 
 from app.shared.database import Base
@@ -19,7 +19,16 @@ class RegulatorySource(Base):
     issuer_name = Column(String, nullable=False)
     base_url = Column(String, nullable=False)
     permitted_use_statement = Column(String)
-    status = Column(String, nullable=False, default="DRAFT")
+    status = Column(String, nullable=False, default="DRAFT")  # DRAFT | PENDING_USE_REVIEW | ACTIVE | SUSPENDED | RETIRED
+    # tata kelola sumber (migrasi 006, FR-RKM-001)
+    url_allow_list = Column(JSONB, nullable=False, default=list)  # awalan URL asal yang sah untuk sumber ini
+    citation_requirement_text = Column(String)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    submitted_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
+    approved_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
+    approved_at = Column(DateTime(timezone=True))
+    return_reason = Column(String)
 
 
 class Document(Base):
@@ -49,7 +58,12 @@ class DocumentVersion(Base):
     state = Column(String, nullable=False, default="PARSING")
     is_partial = Column(Boolean, nullable=False, default=False)
     extraction_method = Column(String, nullable=False, default="TEXT_LAYER")  # TEXT_LAYER | OCR | PLAIN_TEXT
-    ocr_pages = Column(JSONB, nullable=False, default=list)  # halaman yang dibaca lewat OCR, mis. [1, 2]
+    ocr_pages = Column(JSONB, nullable=False, default=list)
+    # provenans berkas (migrasi 006, FR-RKM-002)
+    file_name = Column(String)
+    mime_type = Column(String)
+    size_bytes = Column(BigInteger)
+    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))  # halaman yang dibaca lewat OCR, mis. [1, 2]
 
 
 class Provision(Base):

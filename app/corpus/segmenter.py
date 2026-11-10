@@ -7,6 +7,13 @@ Struktur dokumen yang dikenali (sesuai UU 12/2011 tentang Pembentukan Peraturan 
     [penutup: "Agar setiap orang mengetahuinya ...", "Ditetapkan di ...", tanda tangan, pengundangan]
     PENJELASAN     → I. UMUM, II. PASAL DEMI PASAL → Pasal 1, Pasal 2, ...  (opsional)
 
+Dua bentuk lain juga dikenali:
+  - PERATURAN PERUBAHAN: batang tubuhnya "Pasal I", "Pasal II" (angka romawi). Di dalam Pasal I ada teks
+    "Ketentuan Pasal 5 diubah sehingga berbunyi: Pasal 5 ...". Pasal arab di dalamnya adalah ISI perubahan,
+    jadi dokumen seperti ini hanya dipotong per Pasal romawi.
+  - SURAT EDARAN (SEOJK, SEBI): tanpa "Pasal"; isinya bagian romawi "I. KETENTUAN UMUM", "II. ...", masing-masing
+    berisi angka "1.", "2.", .... Dipotong menjadi "Bagian I / Angka 1", dst.
+
 Pasal batang tubuh menjadi segmen "Pasal N". Penjelasan per pasal menjadi segmen terpisah
 "Penjelasan Pasal N" (dikelompokkan di bawah "Penjelasan"); penjelasan yang hanya berbunyi
 "Cukup jelas." dilewati karena tidak menambah informasi.
@@ -26,6 +33,12 @@ BAB_RE = re.compile(r"^[ \t]*BAB[ \t]+([IVXLCDM]+)[ \t]*$", re.M | re.I)
 # Rujukan di tengah kalimat ("dimaksud dalam Pasal 2 ayat (1)") tetap TIDAK dianggap judul,
 # karena ^...$ mewajibkan baris itu tidak berisi teks lain.
 PASAL_RE = re.compile(r"^[ \t]*Pasa[lI1][ \t]*(\d+[A-Z]?)[ \t]*\.?[ \t]*$", re.M | re.I)
+# Pasal romawi pada peraturan perubahan: "Pasal I", "PASAL II" (spasi wajib agar "PasaII" tidak tertukar)
+PASAL_ROMAN_RE = re.compile(r"^[ \t]*(?i:pasa[l1])[ \t]+([IVX]{1,6})[ \t]*\.?[ \t]*$", re.M)
+# Bagian Surat Edaran: "I. KETENTUAN UMUM" — angka romawi + titik + judul berhuruf kapital
+SE_SECTION_RE = re.compile(r"^[ \t]*([IVX]{1,6})\.[ \t]+([A-Z][A-Z0-9 ,&()/\-]{2,})[ \t]*$", re.M)
+# Angka di dalam bagian Surat Edaran: "1. Dalam Surat Edaran ini ..."
+SE_POINT_RE = re.compile(r"^[ \t]*(\d{1,2})\.[ \t]+(?=\S)", re.M)
 
 # Awal bagian PENJELASAN: baris yang isinya hanya kata "PENJELASAN" (huruf kapital, seperti di lembaran resmi)
 PENJELASAN_RE = re.compile(r"^[ \t]*PENJELASAN[ \t]*$", re.M)
@@ -90,6 +103,83 @@ def _segments(text: str, *, start: int, stop: int, explanation: bool) -> list[Se
     return out
 
 
+def _confidence(body: str) -> float:
+    return 0.95 if len(body) > 20 else 0.5
+
+
+def _roman_segments(text: str, *, start: int, stop: int, explanation: bool) -> list[Segment]:
+    """Peraturan perubahan: potong hanya per "Pasal I/II/..."; pasal arab di dalamnya tetap menjadi isi."""
+    part = text[start:stop]
+    heads = list(PASAL_ROMAN_RE.finditer(part))
+    out: list[Segment] = []
+    for i, m in enumerate(heads):
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(part)
+        body = part[m.end():end].strip()
+        no = m.group(1)
+        if explanation:
+            if not body or CUKUP_JELAS_RE.match(body):
+                continue
+            out.append(Segment(f"PENJELASAN-PASAL-{no}", f"Penjelasan Pasal {no}", f"Penjelasan/Pasal {no}", body,
+                               _confidence(body), "PENJELASAN"))
+        else:
+            out.append(Segment(f"PASAL-{no}", f"Pasal {no}", f"Pasal {no}", body, _confidence(body)))
+    return out
+
+
+def _circular_segments(text: str, *, stop: int) -> list[Segment]:
+    """Surat Edaran: bagian romawi berjudul kapital → angka 1., 2., ... yang berurutan di dalamnya."""
+    part = text[:stop]
+    sections = list(SE_SECTION_RE.finditer(part))
+    # bagian dianggap sah hanya bila romawinya berurutan mulai I (menyaring baris kapital lain)
+    expected, valid = 1, []
+    for m in sections:
+        if _roman_value(m.group(1)) == expected:
+            valid.append(m)
+            expected += 1
+    out: list[Segment] = []
+    for i, m in enumerate(valid):
+        end = valid[i + 1].start() if i + 1 < len(valid) else len(part)
+        body = part[m.end():end]
+        roman, title = m.group(1), m.group(2).strip().replace("/", "-")
+        group = f"Bagian {roman} – {title.title()}"
+        # angka yang berurutan 1, 2, 3 … (baris lain yang kebetulan diawali angka diabaikan)
+        points, want = [], 1
+        for p in SE_POINT_RE.finditer(body):
+            if int(p.group(1)) == want:
+                points.append(p)
+                want += 1
+        intro = body[:points[0].start()].strip() if points else body.strip()
+        if intro and (len(intro) > 20 or not points):
+            out.append(Segment(f"BAGIAN-{roman}", f"Bagian {roman}", f"{group}/Pengantar" if points else group,
+                               intro, _confidence(intro), "BAGIAN"))
+        for j, p in enumerate(points):
+            p_end = points[j + 1].start() if j + 1 < len(points) else len(body)
+            txt = body[p.end():p_end].strip()
+            no = p.group(1)
+            out.append(Segment(f"BAGIAN-{roman}-ANGKA-{no}", f"Angka {no}", f"{group}/Angka {no}", txt,
+                               _confidence(txt), "ANGKA"))
+    return out
+
+
+def _is_amendment(text: str, stop: int) -> bool:
+    """Peraturan perubahan = ada "Pasal I" DAN "Pasal II", dan Pasal I berisi kata perubahan.
+    Syarat ketat ini mencegah salah deteksi saat OCR membaca "Pasal 1" sebagai "Pasal I"."""
+    heads = {m.group(1): m for m in PASAL_ROMAN_RE.finditer(text, 0, stop)}
+    if "I" not in heads or "II" not in heads:
+        return False
+    first = text[heads["I"].end():heads["II"].start()]
+    return bool(re.search(r"\b(diubah|disisipkan|dihapus|ditambahkan)\b", first, re.I))
+
+
+def _roman_value(r: str) -> int:
+    vals = {"I": 1, "V": 5, "X": 10}
+    total = 0
+    for a, b in zip(r, r[1:] + " "):
+        v = vals[a]
+        total += -v if b != " " and vals.get(b, 0) > v else v
+    return total
+
+
 def segment_text(raw: str) -> list[Segment]:
     text = normalize_text(raw)
     # batas batang tubuh: sebelum bagian PENJELASAN (bila ada)
@@ -97,10 +187,25 @@ def segment_text(raw: str) -> list[Segment]:
     body_end = pj.start() if pj else len(text)
     # isi pasal terakhir berhenti di awal penutup ("Agar setiap orang mengetahuinya", "Ditetapkan di")
     closing = PENUTUP_RE.search(text, 0, body_end)
-    out = _segments(text, start=0, stop=closing.start() if closing else body_end, explanation=False)
+    body_stop = closing.start() if closing else body_end
+
+    # bentuk dokumen: peraturan perubahan (Pasal romawi) → peraturan biasa (Pasal arab) → surat edaran
+    amendment = _is_amendment(text, body_stop)
+    if not amendment:
+        # bukan peraturan perubahan: "Pasal I"/"Pasal l" adalah salah baca OCR untuk "Pasal 1"
+        text = re.sub(r"^([ \t]*(?i:pasa[lI1]))[ \t]+[Il][ \t]*\.?[ \t]*$", r"\1 1", text, flags=re.M)
+        # panjang teks bisa berubah → hitung ulang batas penjelasan & penutup
+        pj = PENJELASAN_RE.search(text)
+        body_end = pj.start() if pj else len(text)
+        closing = PENUTUP_RE.search(text, 0, body_end)
+        body_stop = closing.start() if closing else body_end
+    cut = _roman_segments if amendment else _segments
+    out = cut(text, start=0, stop=body_stop, explanation=False)
+    if not out:
+        return _circular_segments(text, stop=body_stop)
     if pj:  # penjelasan per pasal, mulai dari "PASAL DEMI PASAL"
         pdp = PASAL_DEMI_PASAL_RE.search(text, pj.end())
         if pdp:
             tln = TLN_RE.search(text, pdp.end())
-            out += _segments(text, start=pdp.end(), stop=tln.start() if tln else len(text), explanation=True)
+            out += cut(text, start=pdp.end(), stop=tln.start() if tln else len(text), explanation=True)
     return out

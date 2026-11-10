@@ -12,6 +12,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.compliance.services import corpus_basis, disclaimer
+from app.platform.config_service import get_value
+from app.platform.governance import audit
 from app.platform.models import AiCallLog
 
 MIN_COVERAGE = 0.5
@@ -67,7 +69,7 @@ def retrieve(db: Session, question: str, limit: int = 3) -> tuple[list[dict], li
     return [h for h in scored if h["coverage"] >= MIN_COVERAGE][:limit], lexemes
 
 
-def answer_query(db: Session, question: str) -> dict:
+def answer_query(db: Session, question: str, user_id=None) -> dict:
     note = disclaimer(corpus_basis(db))  # §13.6: penafian tetap juga tampil di antarmuka copilot
     hits, lexemes = retrieve(db, question)
     legal = bool(LEGAL_ADVICE.search(question))
@@ -88,10 +90,26 @@ def answer_query(db: Session, question: str) -> dict:
                                "Peninjau Hukum atau Pejabat Kepatuhan; ketentuan terkait disertakan sebagai rujukan.")
     out.update({"ai_label": "DRAFT_GENERATED_BY_AI", "disclaimer": note, "mode": "retrieval_only",
                 "confidence": round(max((h["coverage"] for h in hits), default=0.0), 3)})
+    # FR-COP-005: jawaban yang disajikan tetapi keyakinannya di bawah ambang → ditandai, dapat dikirim untuk ditinjau
+    threshold = get_value(db, "copilot.review_threshold")
+    out["review_threshold"] = threshold
+    out["low_confidence"] = state == "PRESENTED" and out["confidence"] < threshold
+    # FR-COP-004: log interaksi lengkap per pengguna (tabelnya append-only, tidak dapat disunting)
     log = AiCallLog(template_name="copilot_retrieval", template_version="v1", model_id="fts-indonesian-coverage",
-                    prompt_rendered=question, raw_response=json.dumps({"state": state, "citations": out["citations"]}),
+                    prompt_rendered=question, user_id=user_id, presented_state=state,
+                    raw_response=json.dumps({"state": state, "citations": out["citations"],
+                                             "low_confidence": out["low_confidence"],
+                                             "retrieved": [{"provision_version_id": h["provision_version_id"],
+                                                            "citation": f"{h['canonical_number']} {h['number_label']}",
+                                                            "coverage": h["coverage"]} for h in hits]}),
                     schema_valid=True, grounding_passed=bool(hits), confidence=out["confidence"])
     db.add(log)
+    db.flush()
+    audit(db, user_id, "COPILOT_INTERACTION_LOGGED", "ai_call_log", log.id,
+          after={"state": state, "confidence": out["confidence"], "low_confidence": out["low_confidence"]})
+    if out["low_confidence"]:
+        audit(db, user_id, "LOW_CONFIDENCE_FLAGGED", "ai_call_log", log.id,
+              after={"confidence": out["confidence"], "threshold": threshold})
     db.commit()
     out["interaction_id"] = str(log.id)
     return out

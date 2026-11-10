@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import type { ChangeEvent } from "react";
 import { canDo } from "../permissions";
-import { api } from "../api";
-import type { Doc } from "../types";
+import { ApiError, api, openFile } from "../api";
+import type { Doc, Source } from "../types";
 import type { Ctx } from "../ui";
-import { Empty, Flow, PageHead, Status, can, fmtDate, useAction, useLoad } from "../ui";
+import { Empty, Flow, PageHead, PasalText, Status, can, fmtDate, useAction, useLoad } from "../ui";
+
+// [A10] jenis instrumen yang bisa dipilih (SEOJK = Surat Edaran OJK)
+const INSTRUMENTS = ["UU", "PP", "POJK", "SEOJK", "PBI", "PADG"];
+// [A10] ukuran berkas yang mudah dibaca: 1532 → "1,5 KB"
+const fmtSize = (n?: number | null) => n == null ? "" : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toLocaleString("id-ID", { maximumFractionDigits: 1 })} KB` : `${(n / 1048576).toLocaleString("id-ID", { maximumFractionDigits: 1 })} MB`;
 
 // [11a] low_confidence_text = true → teks pasal hasil OCR yang belum dikonfirmasi analis
 type Prov = { provision_version_id: string; number_label: string; path: string; text: string; confidence: number; corrected_by_human: boolean; low_confidence_text?: boolean };
@@ -29,7 +33,12 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
   const [docs, reload] = useLoad<Doc[]>(() => api("/corpus/documents"), [], ctx.notify);
   const [sel, setSel] = useState<string>("");
   const [provs, setProvs] = useState<Prov[]>([]);
-  const [nd, setNd] = useState({ canonical_number: "", title_id: "", instrument_type: "POJK" });
+  const [nd, setNd] = useState({ canonical_number: "", title_id: "", instrument_type: "POJK", source_id: "" });
+  // [A11] registri sumber: hanya sumber ACTIVE yang boleh dipilih saat mendaftarkan dokumen
+  const [sources] = useLoad<Source[]>(() => api("/corpus/sources"), [], ctx.notify);
+  const activeSources = (sources || []).filter(x => x.status === "ACTIVE");
+  // [A12] filter daftar dokumen: kata kunci (nomor/judul/penerbit), status dokumen, jenis instrumen
+  const [fq, setFq] = useState(""), [fStatus, setFStatus] = useState(""), [fType, setFType] = useState("");
   const { run, busy } = useAction(ctx.notify, reload);
   const analyst = can(ctx.me.role, "corpus_write"), officer = can(ctx.me.role, "obligation_extract");
   useEffect(() => { if (!sel && docs?.[0]?.versions.length) setSel(docs[0].versions[docs[0].versions.length - 1].id); }, [docs]);
@@ -42,17 +51,32 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
   const draft = !!selVer && ["SEGMENTED_DRAFT", "UNDER_CORRECTION"].includes(selVer.state);
   // [11b] jumlah pasal OCR yang belum diperiksa → ditampilkan di kotak peringatan
   const ocrPending = provs.filter(p => p.low_confidence_text).length;
+  // [A12] terapkan filter; huruf besar/kecil diabaikan
+  const term = fq.trim().toLowerCase();
+  const shown = (docs || []).filter(d => (!fStatus || d.status === fStatus) && (!fType || d.instrument_type === fType)
+    && (!term || [d.canonical_number, d.title_id, d.issuer || ""].some(x => x.toLowerCase().includes(term))));
+  const statuses = Array.from(new Set((docs || []).map(d => d.status)));
 
-  const upload = (e: ChangeEvent<HTMLInputElement>, docId: string) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    const form = new FormData(); form.append("file", f); form.append("effective_date", new Date().toISOString().slice(0, 10));
-    run(async () => {
+  // [A13] unggah versi: URL asal WAJIB; berkas yang sama persis dengan versi lain ditolak (DUPLICATE_SUSPECTED)
+  const upload = (docId: string, file: File, origin: string) => run(async () => {
+    const form = new FormData();
+    form.append("file", file); form.append("origin_url", origin.trim());
+    form.append("effective_date", new Date().toISOString().slice(0, 10));
+    try {
       const r = await api(`/corpus/documents/${docId}/versions`, { form }); setSel(r.version_id);
       // [11c] PDF hasil pindaian: beri tahu halaman mana yang dibaca lewat OCR
       if (r.extraction_method === "OCR") ctx.notify("ok", `PDF hasil pindaian: halaman ${r.ocr_pages.join(", ")} dibaca lewat OCR. Periksa setiap pasal sebelum publikasi.`);
-    }, "Versi baru diunggah dan tersegmentasi. Periksa pasal lalu publikasikan.");
-    e.target.value = "";
-  };
+      // [A13] URL tetap diterima walau di luar situs sumber, tetapi analis diberi tahu agar memeriksa ulang
+      if (r.origin_outside_source) ctx.notify("ok", "Versi diunggah. Perhatian: URL asal berada di luar situs sumber dokumen ini; pastikan URL-nya benar.");
+    } catch (e) {
+      // [A13] duplikat: tunjukkan dokumen yang sudah memuat berkas itu dan buka versinya
+      if (e instanceof ApiError && e.code === "DUPLICATE_SUSPECTED" && e.offending?.existing_version_id) {
+        setSel(e.offending.existing_version_id);
+        throw new Error(`${e.message}. Versi tersebut sekarang ditampilkan; unggahan dibatalkan.`);
+      }
+      throw e;
+    }
+  }, "Versi baru diunggah dan tersegmentasi. Periksa pasal lalu publikasikan.");
   const extract = (pv: string) => run(() => api("/compliance/obligations/extract", { body: { provision_version_id: pv } }),
     "Draf kewajiban dibuat dan berlabel Draf AI. Validasi di halaman Kewajiban.");
 
@@ -62,7 +86,13 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
       <div>
         {selVer ? <section className="panel">
           {/* [11d] judul versi; bila teksnya dari OCR ditambah keterangan " · teks via OCR" */}
-          <header><div><h2>{selDoc?.canonical_number}</h2><p>{selDoc?.title_id} · versi {selVer.version_number}, berlaku {fmtDate(selVer.effective_date)}{selVer.extraction_method === "OCR" ? " · teks via OCR" : ""}</p></div><Status s={selVer.state} /></header>
+          <header><div><h2>{selDoc?.canonical_number}</h2><p>{selDoc?.title_id} · versi {selVer.version_number}, berlaku {fmtDate(selVer.effective_date)}{selVer.extraction_method === "OCR" ? " · teks via OCR" : ""}</p>
+            {/* [A14] provenans: sumber, URL asal, berkas asli → semua peran dapat membuka PDF aslinya untuk dibandingkan */}
+            <div className="prov-meta">{selDoc?.source?.name && <>Sumber: {selDoc.source.name} · </>}
+              {selVer.origin_url ? <>URL asal: <a href={selVer.origin_url} target="_blank" rel="noreferrer">{selVer.origin_url}</a></> : "URL asal belum tercatat"}
+              {selVer.file_name && <> · {selVer.file_name} ({fmtSize(selVer.size_bytes)})</>}</div></div>
+            <span className="row">{selVer.has_file && <button className="btn sm" onClick={() => openFile(`/corpus/versions/${selVer.id}/file`).catch(e => ctx.notify("error", e.message))}>Lihat berkas asli</button>}
+              <Status s={selVer.state} /></span></header>
           {/* [11d] kotak peringatan kuning: publikasi diblokir selama masih ada pasal OCR yang belum dikonfirmasi */}
           {draft && ocrPending > 0 && <div className="notice warn"><span>{ocrPending} pasal berasal dari OCR dan belum diperiksa. Bandingkan dengan PDF aslinya, lalu klik <b>Konfirmasi teks</b> atau <b>Koreksi teks</b> pada setiap pasal sebelum publikasi.</span></div>}
           {/* Pasal dikelompokkan per BAB; setiap BAB bisa dilipat/dibuka */}
@@ -77,7 +107,16 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
       <aside>
         <section className="panel">
           <h2>Dokumen</h2>
-          {docs?.length ? <ul className="list">{docs.map(d => <li key={d.id}>
+          {/* [A12] kotak pencarian + filter status & jenis instrumen */}
+          <div className="doc-filter">
+            <input value={fq} onChange={e => setFq(e.target.value)} placeholder="Cari nomor, judul, atau penerbit" aria-label="Cari dokumen" />
+            <div className="form-2">
+              <select value={fStatus} onChange={e => setFStatus(e.target.value)} aria-label="Filter status"><option value="">Semua status</option>{statuses.map(x => <option key={x} value={x}>{x}</option>)}</select>
+              <select value={fType} onChange={e => setFType(e.target.value)} aria-label="Filter jenis"><option value="">Semua jenis</option>{INSTRUMENTS.map(x => <option key={x}>{x}</option>)}</select>
+            </div>
+            {docs && <span className="small muted">{shown.length} dari {docs.length} dokumen</span>}
+          </div>
+          {shown.length ? <ul className="list">{shown.map(d => <li key={d.id}>
             <div className="between"><div className="title">{d.canonical_number}</div><Status s={d.status} /></div><div className="sub">{d.issuer} · {d.title_id}</div>
             {!!d.labels?.length && <div className="row" style={{ marginTop: 6, gap: 4 }}>{d.labels.map((l, i) => <span key={i} className={`badge ${l.state === "CONFIRMED" ? "teal" : ""}`} title={`${l.dimension} · ${l.state === "CONFIRMED" ? "terkonfirmasi" : "saran aturan"}`}>{l.value}</span>)}</div>}
             <div className="row" style={{ marginTop: 8 }}>{d.versions.map(v => <span key={v.id} className="row" style={{ gap: 4 }}>
@@ -87,17 +126,29 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
             </span>)}</div>
             {/* Tombol Hapus/Tarik versi & Hapus dokumen (khusus Analis); kosongkan pilihan bila versi yang dibuka ikut terhapus */}
             {analyst && <CorpusActions role={ctx.me.role} doc={d} busy={busy} run={run} onRemoved={id => { if (d.versions.some(v => v.id === sel) && (id === d.id || id === sel)) setSel(""); }} />}
-            {analyst && <label className="field" style={{ marginTop: 10 }}>Unggah versi baru (.pdf/.txt)<input type="file" accept=".pdf,.txt" onChange={e => upload(e, d.id)} /></label>}
-          </li>)}</ul> : <Empty>Belum ada dokumen.</Empty>}
+            {/* [A13] formulir unggah: URL asal wajib diisi sebelum berkas dikirim */}
+            {analyst && <UploadForm busy={busy} onUpload={(f, url) => upload(d.id, f, url)} />}
+          </li>)}</ul> : <Empty>{docs?.length ? "Tidak ada dokumen yang cocok dengan filter." : "Belum ada dokumen."}</Empty>}
         </section>
+        {/* [A15] ubah judul/nomor/jenis/penerbit dokumen terpilih (matriks: Perubahan status dokumen U = Analis) */}
+        {selDoc && canDo(ctx.me.role, "doc_status", "U") && <DocEdit key={`edit-${selDoc.id}`} doc={selDoc} busy={busy} run={run} />}
         {selDoc && <DocGovernance key={selDoc.id} doc={selDoc} docs={docs || []} ctx={ctx} onChange={reload} />}
         {analyst && <section className="panel">
           <h2>Daftarkan dokumen</h2>
           <div className="form">
             <label className="field">Nomor regulasi<input value={nd.canonical_number} onChange={e => setNd({ ...nd, canonical_number: e.target.value })} placeholder="POJK 4/POJK.05/2021" /></label>
             <label className="field">Judul<input value={nd.title_id} onChange={e => setNd({ ...nd, title_id: e.target.value })} placeholder="Penerapan Manajemen Risiko bagi Bank Umum" /></label>
-            <label className="field">Jenis instrumen<select value={nd.instrument_type} onChange={e => setNd({ ...nd, instrument_type: e.target.value })}>{["UU", "PP", "POJK", "SEOJK", "PBI", "PADG"].map(x => <option key={x}>{x}</option>)}</select></label>
-            <button className="btn primary" disabled={busy || !nd.canonical_number || !nd.title_id} onClick={() => run(async () => { await api("/corpus/documents", { body: nd }); setNd({ canonical_number: "", title_id: "", instrument_type: "POJK" }); }, "Dokumen terdaftar. Unggah versi pertamanya.")}>Daftarkan dokumen</button>
+            <label className="field">Jenis instrumen<select value={nd.instrument_type} onChange={e => setNd({ ...nd, instrument_type: e.target.value })}>{INSTRUMENTS.map(x => <option key={x}>{x}</option>)}</select></label>
+            {/* [A11] sumber wajib dipilih dari registri; sumber yang belum disetujui Manajer tidak muncul */}
+            <label className="field">Sumber regulasi<select value={nd.source_id} onChange={e => setNd({ ...nd, source_id: e.target.value })}>
+              <option value="">Pilih sumber aktif</option>{activeSources.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+            {sources && !activeSources.length && <p className="small muted" style={{ margin: 0 }}>Belum ada sumber aktif. Daftarkan di menu <button className="rowlink" style={{ display: "inline", padding: 0 }} onClick={() => ctx.go("sumber")}>Sumber regulasi</button>.</p>}
+            <button className="btn primary" disabled={busy || !nd.canonical_number || !nd.title_id || !nd.source_id} onClick={() => run(async () => {
+              // issuer diisi dari penerbit sumber agar konsisten
+              const src = activeSources.find(x => x.id === nd.source_id);
+              await api("/corpus/documents", { body: { ...nd, issuer: src?.issuer_name } });
+              setNd({ canonical_number: "", title_id: "", instrument_type: "POJK", source_id: "" });
+            }, "Dokumen terdaftar. Unggah versi pertamanya.")}>Daftarkan dokumen</button>
           </div>
         </section>}
       </aside>
@@ -144,8 +195,49 @@ function ProvItem({ p, draft, analyst, canExtract, busy, run, extract, onSaved }
         <button className="btn primary sm" disabled={busy || !text.trim()} onClick={save}>Simpan koreksi</button>
         <button className="btn sm ghost" onClick={() => setEdit(false)}>Batal</button>
       </div>
-    </div> : <div className="verbatim justify" lang="id">{p.text}</div>}
+    </div> : <PasalText text={p.text} className="justify" />}
+    {/* [A8] teks ditampilkan per ayat/angka/huruf; teks asli tetap utuh (terlihat saat Koreksi teks) */}
   </li>;
+}
+
+/** [A13] KOMPONEN BARU. Unggah versi: isi URL asal (wajib) → pilih berkas → klik Unggah. */
+function UploadForm({ busy, onUpload }: { busy: boolean; onUpload: (f: File, url: string) => Promise<boolean> }) {
+  const [url, setUrl] = useState(""), [file, setFile] = useState<File | null>(null), [k, setK] = useState(0);
+  const okUrl = /^https?:\/\/\S+\.\S+/.test(url.trim());  // pemeriksaan ringan; server tetap memeriksa
+  return <div className="form" style={{ marginTop: 10 }}>
+    <label className="field">URL asal dokumen (wajib)<input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.ojk.go.id/id/regulasi/..." /></label>
+    <label className="field">Berkas versi baru (.pdf/.txt)<input key={k} type="file" accept=".pdf,.txt" onChange={e => setFile(e.target.files?.[0] || null)} /></label>
+    <div><button className="btn sm primary" disabled={busy || !file || !okUrl} onClick={async () => {
+      if (file && await onUpload(file, url)) { setFile(null); setUrl(""); setK(x => x + 1); }  // k berubah → input berkas dikosongkan
+    }}>Unggah versi</button>{url && !okUrl && <span className="small" style={{ color: "var(--red)", marginLeft: 8 }}>URL harus diawali http:// atau https://</span>}</div>
+  </div>;
+}
+
+/** [A15] KOMPONEN BARU. Ubah data dokumen. Nomor regulasi dikunci bila dokumen pernah terbit
+ *  (kewajiban & sitasi sudah memakai nomor itu); judul, jenis, dan penerbit tetap boleh diperbaiki. */
+function DocEdit({ doc, busy, run }: { doc: Doc; busy: boolean; run: Run }) {
+  const [f, setF] = useState({ canonical_number: doc.canonical_number, title_id: doc.title_id, instrument_type: doc.instrument_type, issuer: doc.issuer || "" });
+  const [open, setOpen] = useState(false);
+  const frozen = doc.versions.some(v => v.state === "PUBLISHED" || v.state === "WITHDRAWN");
+  // kirim hanya kolom yang berubah
+  const changes = Object.fromEntries(Object.entries(f).filter(([k, v]) => v.trim() !== String((doc as any)[k] ?? "")).map(([k, v]) => [k, v.trim()]));
+  return <section className="panel">
+    <div className="between"><h2>Data dokumen</h2>{!open && <button className="btn sm ghost" onClick={() => setOpen(true)}>Ubah</button>}</div>
+    {open && <div className="form">
+      <label className="field">Nomor regulasi<input value={f.canonical_number} disabled={frozen} onChange={e => setF({ ...f, canonical_number: e.target.value })} /></label>
+      {frozen && <p className="small muted" style={{ margin: 0 }}>Nomor dikunci karena dokumen pernah terbit.</p>}
+      <label className="field">Judul<input value={f.title_id} onChange={e => setF({ ...f, title_id: e.target.value })} /></label>
+      <div className="form-2">
+        <label className="field">Jenis<select value={f.instrument_type} onChange={e => setF({ ...f, instrument_type: e.target.value })}>{INSTRUMENTS.map(x => <option key={x}>{x}</option>)}</select></label>
+        <label className="field">Penerbit<input value={f.issuer} onChange={e => setF({ ...f, issuer: e.target.value })} /></label>
+      </div>
+      <div className="row">
+        <button className="btn primary sm" disabled={busy || !Object.keys(changes).length || !f.canonical_number.trim() || !f.title_id.trim()}
+          onClick={async () => { if (await run(() => api(`/corpus/documents/${doc.id}`, { method: "PATCH", body: changes }), "Data dokumen diperbarui; tercatat di jejak audit.")) setOpen(false); }}>Simpan</button>
+        <button className="btn sm ghost" onClick={() => { setOpen(false); setF({ canonical_number: doc.canonical_number, title_id: doc.title_id, instrument_type: doc.instrument_type, issuer: doc.issuer || "" }); }}>Batal</button>
+      </div>
+    </div>}
+  </section>;
 }
 
 /** Hapus versi draf / dokumen yang belum pernah terbit; tarik (bukan hapus) versi yang sudah terbit.

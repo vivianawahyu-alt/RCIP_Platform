@@ -35,7 +35,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 const STATE_LABEL: Record<string, [string, string]> = {
   AI_DRAFT: ["Draf AI", "ai"], IN_VALIDATION: ["Validasi", "amber"], PENDING_APPROVAL: ["Menunggu persetujuan", "blue"],
-  ACTIVE: ["Aktif", "green"], REVIEW_REQUIRED: ["Perlu ditinjau", "red"], SUPERSEDED: ["Digantikan", ""], RETIRED: ["Pensiun", ""],
+  ACTIVE: ["Aktif", "green"], PENDING_USE_REVIEW: ["Reviu penggunaan", "blue"], SUSPENDED: ["Ditangguhkan", "red"], REVIEW_REQUIRED: ["Perlu ditinjau", "red"], SUPERSEDED: ["Digantikan", ""], RETIRED: ["Pensiun", ""],
   OPEN: ["Terbuka", "red"], ACTION_PLANNED: ["Tindakan direncanakan", "amber"], IN_REMEDIATION: ["Dalam remediasi", "blue"],
   PENDING_CLOSURE_VALIDATION: ["Menunggu validasi penutupan", "teal"], CLOSED: ["Ditutup", "green"], RISK_ACCEPTED: ["Risiko diterima", "amber"],
   IN_PROGRESS: ["Berjalan", "blue"], DONE: ["Selesai", "green"], CANCELLED: ["Dibatalkan", ""],
@@ -85,6 +85,11 @@ const ACTION: Record<string, [string, string]> = {
   report_issue: ["report_issue", "A"], audit_read: ["audit_trail", "R"], evidence_download: ["evidence_access", "R"],
   applicability_create: ["applicability", "C"], profile_update: ["org_profile", "U"],
   user_admin_read: ["user_admin", "R"], user_admin_write: ["user_admin", "C"], config_read: ["system_config", "R"],
+  // [A7] registri sumber: daftarkan/ajukan = C (Analis, Admin); setujui, tangguhkan, pensiunkan = D (hanya Administrator,
+  //      sama dengan penjagaan server yang mempersempit U ke Administrator)
+  source_write: ["source_registry", "C"], source_approve: ["source_registry", "D"],
+  // [A7] putusan tinjauan jawaban copilot = Promosi keluaran copilot (Analis, Pejabat, Peninjau Hukum)
+  copilot_review: ["copilot_promote", "C"],
 };
 export const can = (role: Role, action: string): boolean => {
   const [cap, letter] = ACTION[action] || ["", ""];
@@ -97,7 +102,10 @@ const PAGE_READ: Record<string, [string, string][]> = {
   keberlakuan: [["applicability", "R"]], kewajiban: [["obligation", "R"]], kontrol: [["control_library", "R"]],
   asesmen: [["assessment_conclusion", "R"]], temuan: [["finding", "R"]], laporan: [["report_published", "R"]],
   audit: [["audit_trail", "R"]], admin: [["system_config", "R"], ["user_admin", "R"]],
+  sumber: [["source_registry", "R"]],  // [A19] halaman Sumber regulasi
 };
+/** [A18] log interaksi copilot: Promosi keluaran copilot (R) atau Jejak audit (R) — sama dengan server */
+export const canReadCopilotLog = (role: Role) => canDo(role, "copilot_promote", "R") || canDo(role, "audit_trail", "R");
 export const canSeePage = (role: Role, page: string): boolean =>
   (PAGE_READ[page] || [["dashboard", "R"]]).some(([c, l]) => canDo(role, c, l));
 
@@ -107,4 +115,56 @@ export function ImpactIcon({ level }: { level: "high" | "medium" | "low" }) {
   return <svg className="impact-ico" viewBox="0 0 18 18" aria-label={`dampak ${level}`} role="img">
     {[0, 1, 2].map(i => <rect key={i} x={2 + i * 5.5} y={12 - i * 4} width="4" height={4 + i * 4} rx="1" fill={i < bars ? c : "#dde2ea"} />)}
   </svg>;
+}
+
+// ------------------------------------------------------------------------------------------------------
+// [A8] Tampilan teks pasal: ayat (1), angka 1., huruf a. masing-masing di baris sendiri, menjorok sesuai tingkatnya.
+// Teks asli di database TIDAK diubah; ini hanya cara menampilkan.
+// ------------------------------------------------------------------------------------------------------
+// Penanda butir di AWAL baris: "(1)" ayat · "1." / "1)" angka · "a." / "a)" huruf
+const MARK_RE = /^(\(\d{1,3}\)|\d{1,3}[.)]|[a-z][.)])(?=\s|$)/;
+// Baris nomor halaman hasil PDF, mis. "- 3 -" → dibuang
+const PAGE_RE = /^-\s*\d+\s*-$/;
+// Kata rujukan di akhir baris sebelumnya: "...dimaksud pada ayat" + "(1) dilaksanakan" adalah RUJUKAN, bukan ayat baru.
+// Dicek per jenis penanda, agar "a. ...; dan" + "b. ..." tetap terpecah menjadi dua huruf.
+const REF_END: Record<string, RegExp> = { ayat: /\bayat$/i, huruf: /\bhuruf$/i, angka: /\b(angka|pasal|butir|nomor)$/i };
+// Judul butir penjelasan, mis. "Ayat (1)", "Huruf a", "Angka 3" → paragraf baru
+const PENJ_RE = /^(Ayat \(\d{1,3}\)|Huruf [a-z]|Angka \d{1,3})(\s|$)/;
+type Line = { mark: string; text: string; depth: number };
+
+/** Ubah teks mentah menjadi baris-baris butir. Penanda hanya dikenali di awal baris teks asli,
+ *  jadi rujukan di tengah kalimat ("ayat (1) huruf a") tidak ikut terpecah. */
+export function splitPasal(raw: string): Line[] {
+  const lines: Line[] = [];
+  const kinds: string[] = [];  // urutan jenis penanda yang muncul → menentukan tingkat jorokan
+  let cur: Line | null = null, blank = false;
+  for (const rawLine of (raw || "").split(/\r?\n/)) {
+    const t = rawLine.replace(/\s+/g, " ").trim();
+    if (!t) { blank = true; continue; }
+    if (PAGE_RE.test(t)) continue;
+    const m = t.match(MARK_RE);
+    const kind = !m ? "" : m[1].startsWith("(") ? "ayat" : /^\d/.test(m[1]) ? "angka" : "huruf";
+    if (m && !(cur && REF_END[kind].test(cur.text))) {
+      const mark = m[1];
+      if (!kinds.includes(kind)) kinds.push(kind);
+      cur = { mark, text: t.slice(mark.length).trim(), depth: kinds.indexOf(kind) };
+      lines.push(cur);
+    } else if (!cur || PENJ_RE.test(t) || (blank && /[.:;]$/.test(cur.text))) {
+      // paragraf baru: awal teks, judul butir penjelasan, atau baris kosong setelah kalimat selesai (mis. "Cukup jelas.")
+      cur = { mark: "", text: t, depth: 0 };
+      lines.push(cur);
+    } else {
+      cur.text += (cur.text ? " " : "") + t;  // lanjutan baris yang terpotong PDF
+    }
+    blank = false;
+  }
+  return lines;
+}
+
+export function PasalText({ text, className = "" }: { text: string; className?: string }) {
+  const lines = splitPasal(text);
+  return <div className={`verbatim pasal ${className}`} lang="id">{lines.map((l, i) =>
+    <div key={i} className={l.mark ? "pasal-item" : "pasal-para"} style={{ marginLeft: `${l.depth * 1.6}em` }}>
+      {l.mark && <span className="pasal-mark">{l.mark}</span>}<span>{l.text}</span>
+    </div>)}</div>;
 }

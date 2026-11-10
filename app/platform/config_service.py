@@ -9,6 +9,7 @@ DEFAULTS = {
     "remediation.window_days.CRITICAL": 30, "remediation.window_days.HIGH": 60,
     "remediation.window_days.MEDIUM": 90, "remediation.window_days.LOW": 180,
     "evidence.max_file_mb": 25, "auth.max_failed_logins_per_minute": 5,
+    "copilot.review_threshold": 0.70,  # FR-COP-005: di bawah ini jawaban copilot ditandai berkeyakinan rendah
 }
 
 

@@ -1,5 +1,10 @@
+import hashlib  # sidik jari berkas untuk pemeriksaan duplikat
 from datetime import date
+from typing import Optional
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
 import uuid  # untuk object_id audit dokumen/versi yang dihapus
 
@@ -10,7 +15,9 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.corpus import services
-from app.corpus.models import ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, TaxonomyLabel
+from app.corpus.models import (ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, RegulatorySource,
+                               TaxonomyLabel)
+from app.corpus.sources import get_source, normalise_url, require_active, url_allowed
 from app.platform.auth import current_user
 from app.platform.governance import audit
 from app.platform.models import AppUser
@@ -18,7 +25,7 @@ from app.platform.permissions import allows, require, require_any
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import CitationResolveRequest, CitationResolveResponse, ResponseWrapper
-from app.shared.storage import put_object
+from app.shared.storage import get_object, put_object
 from app.shared.vocabularies import AppRole, VersionState
 
 router = APIRouter(tags=["corpus"])
@@ -30,8 +37,17 @@ class DocumentCreate(BaseModel):
     instrument_type: str = "POJK"
     issuer: str = "Otoritas Jasa Keuangan"
     title_id: str
-    source_category: str = "OJK"
+    source_id: Optional[str] = None  # sumber terdaftar (menu Sumber regulasi); wajib ACTIVE
+    source_category: str = "OJK"     # kompatibilitas lama: dipakai bila source_id kosong
     base_url: str = "https://www.ojk.go.id"
+
+
+class DocumentUpdate(BaseModel):
+    """Ubah data dokumen. Nomor regulasi hanya boleh diubah selama belum ada versi yang pernah terbit."""
+    canonical_number: Optional[str] = None
+    title_id: Optional[str] = None
+    instrument_type: Optional[str] = None
+    issuer: Optional[str] = None
 
 
 class ProvisionCorrection(BaseModel):
@@ -70,16 +86,22 @@ def resolve(payload: CitationResolveRequest, db: Session = Depends(get_db), _: A
 @router.post("/api/v1/corpus/documents", response_model=ResponseWrapper[dict])
 def create_document(body: DocumentCreate, db: Session = Depends(get_db),
                     user: AppUser = Depends(require("source_registry", "C"))):  # Registri Regulatory Source: C = RA, Admin
-    if db.scalar(select(Document).where(Document.canonical_number == body.canonical_number)):
+    if not body.canonical_number.strip() or not body.title_id.strip():
+        raise AppError(422, "VALIDATION_ERROR", "Nomor regulasi dan judul wajib diisi", {"field": "canonical_number"})
+    if db.scalar(select(Document).where(Document.canonical_number == body.canonical_number.strip())):
         raise AppError(409, "DUPLICATE", "Nomor regulasi sudah terdaftar")
-    src = services.get_or_create_source(db, body.source_category, body.source_category, body.issuer, body.base_url)
-    doc = Document(source_id=src.id, canonical_number=body.canonical_number, instrument_type=body.instrument_type,
-                   issuer=body.issuer, title_id=body.title_id)
+    if body.source_id:  # FR-RKM-001: dokumen terikat ke sumber terdaftar yang ACTIVE
+        src = get_source(db, body.source_id)
+    else:  # kompatibilitas lama (seed, tes): sumber dicari/dibuat dari kategori
+        src = services.get_or_create_source(db, body.source_category, body.source_category, body.issuer, body.base_url)
+    require_active(src)
+    doc = Document(source_id=src.id, canonical_number=body.canonical_number.strip(), instrument_type=body.instrument_type,
+                   issuer=body.issuer, title_id=body.title_id.strip())
     db.add(doc)
     db.flush()
     from app.corpus.review import suggest_labels
     suggest_labels(db, doc)
-    audit(db, user.id, "DOCUMENT_CREATED", "document", doc.id)
+    audit(db, user.id, "DOCUMENT_CREATED", "document", doc.id, after={"source": src.name})
     db.commit()
     _share(db, doc.id)  # dokumen baru langsung terlihat oleh tim setelah di-push
     return ResponseWrapper(data={"id": str(doc.id)})
@@ -90,7 +112,8 @@ def list_documents(db: Session = Depends(get_db),
                    user: AppUser = Depends(require_any(("source_registry", "R"), ("document_version", "R")))):
     # Registri sumber + Document Version: dapat dibaca semua peran kecuali Pemilik Bisnis/Kontrol (yang memakai Pencarian korpus)
     out = []
-        # urutkan dari dokumen yang paling baru didaftarkan; bila waktunya sama, urut nomor regulasi
+    sources = {s.id: s for s in db.scalars(select(RegulatorySource))}
+    # urutkan dari dokumen yang paling baru didaftarkan; bila waktunya sama, urut nomor regulasi
     for d in db.scalars(select(Document).order_by(Document.created_at.desc(), Document.canonical_number)):
         vs = db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == d.id)
                         .order_by(DocumentVersion.version_number)).all()
@@ -98,12 +121,18 @@ def list_documents(db: Session = Depends(get_db),
                   for lb in db.scalars(select(TaxonomyLabel).where(TaxonomyLabel.document_id == d.id,
                                                                    TaxonomyLabel.state != "REMOVED"))
                   ] if allows(user, "taxonomy", "R") else []  # label hanya untuk peran yang berhak membaca Taxonomy
+        src = sources.get(d.source_id)
         out.append({"id": str(d.id), "canonical_number": d.canonical_number, "title_id": d.title_id,
                     "status": d.status, "instrument_type": d.instrument_type, "issuer": d.issuer, "labels": labels,
+                    "created_at": d.created_at.isoformat() if d.created_at else None,
+                    "source": {"id": str(src.id), "name": src.name, "status": src.status} if src else None,
                     "versions": [{"id": str(v.id), "version_number": v.version_number, "state": v.state,
                                   "effective_date": str(v.effective_date),
                                   # [6a] cara teks versi diperoleh → UI menampilkan "teks via OCR"
-                                  "extraction_method": v.extraction_method} for v in vs]})
+                                  "extraction_method": v.extraction_method,
+                                  # provenans (FR-RKM-002): asal & berkas aslinya
+                                  "origin_url": v.origin_url, "file_name": v.file_name,
+                                  "size_bytes": v.size_bytes, "has_file": bool(v.canonical_text_ref)} for v in vs]})
     return ResponseWrapper(data=out)
 
 
@@ -113,11 +142,19 @@ async def upload_version(
     doc_id: str,
     file: UploadFile = File(...),
     effective_date: date = Form(...),
-    origin_url: str = Form("upload://manual"),
+    origin_url: str = Form(...),  # FR-RKM-002: URL asal wajib, juga untuk unggahan manual
     db: Session = Depends(get_db),
     user: AppUser = Depends(require("ingestion", "X"))  # Ingestion dokumen: X = Analis Regulasi, Administrator Sistem
 ):
     doc = _get(db, Document, doc_id)
+
+    # 0. Provenans: URL asal wajib berformat http(s); sumber dokumen harus ACTIVE
+    if not origin_url.strip():
+        raise AppError(422, "ORIGIN_URL_REQUIRED", "URL asal wajib diisi, juga untuk unggahan manual",
+                       {"field": "origin_url"})
+    origin_url = normalise_url(origin_url)
+    source = db.get(RegulatorySource, doc.source_id)
+    require_active(source)
 
     # 1. Validasi nama dan ekstensi file
     original_name = (file.filename or "").replace("\\", "/")
@@ -157,6 +194,20 @@ async def upload_version(
             "Berkas tidak memiliki signature PDF yang valid"
         )
 
+    # 4b. FR-RKM-002: berkas yang identik byte-per-byte sudah ada di korpus → tolak sebagai duplikat
+    digest = hashlib.sha256(data).hexdigest()
+    twin = db.execute(select(DocumentVersion, Document).join(Document, Document.id == DocumentVersion.document_id)
+                      .where(DocumentVersion.sha256 == digest)).first()
+    if twin:
+        tv, td = twin
+        audit(db, user.id, "DUPLICATE_SUSPECTED", "document", doc.id,
+              after={"sha256": digest, "existing_document": td.canonical_number, "existing_version": tv.version_number})
+        db.commit()
+        raise AppError(409, "DUPLICATE_SUSPECTED",
+                       f"Berkas yang sama persis sudah ada: {td.canonical_number} versi {tv.version_number}",
+                       {"existing_document_id": str(td.id), "existing_version_id": str(tv.id),
+                        "existing_document": td.canonical_number, "existing_version": tv.version_number})
+
     # 5. Membuat nama objek penyimpanan yang unik
     safe_doc = "".join(
         c if c.isalnum() or c in "-_" else "_"
@@ -182,6 +233,9 @@ async def upload_version(
         key
     )
 
+    # 6b. Provenans berkas (FR-RKM-002)
+    dv.file_name, dv.mime_type, dv.size_bytes, dv.uploaded_by = filename, content_type, len(data), user.id
+
     # 7. Menyimpan file ke storage
     if not put_object(key, data, content_type=content_type):
         db.rollback()
@@ -199,7 +253,8 @@ async def upload_version(
         "VERSION_INGESTED",
         "document_version",
         dv.id,
-        after={"provisions": n, "method": dv.extraction_method}  # [6b] catat juga cara teks diperoleh
+        after={"provisions": n, "method": dv.extraction_method,  # [6b] catat juga cara teks diperoleh
+               "origin_url": origin_url, "file": filename, "sha256": digest, "size_bytes": len(data)}
     )
     # [6b] FR-RKM-004: catat di jejak audit bahwa OCR dipakai dan di halaman mana
     if dv.ocr_pages:
@@ -216,9 +271,56 @@ async def upload_version(
             "provisions_created": n,
             "state": dv.state,
             "extraction_method": dv.extraction_method,  # [6c] dipakai UI untuk menampilkan notifikasi OCR
-            "ocr_pages": dv.ocr_pages
+            "ocr_pages": dv.ocr_pages,
+            # URL asal di luar awalan yang diizinkan sumber → diterima, tetapi UI memberi peringatan
+            "origin_outside_source": not url_allowed(source, origin_url)
         }
     )
+
+
+@router.get("/api/v1/corpus/versions/{version_id}/file")
+def version_file(version_id: str, db: Session = Depends(get_db),
+                 _: AppUser = Depends(require("document_version", "R"))):  # Document Version: R = semua kecuali Pemilik
+    """Berkas asli (PDF/TXT) sebuah versi, untuk dibandingkan dengan teks pasal (mis. memeriksa hasil OCR)."""
+    dv = _get(db, DocumentVersion, version_id)
+    data = get_object(dv.canonical_text_ref) if dv.canonical_text_ref else None
+    if data is None:
+        raise AppError(404, "FILE_NOT_STORED", "Berkas asli versi ini tidak tersimpan (mis. data sintetis)")
+    name = dv.file_name or Path(dv.canonical_text_ref).name
+    media = dv.mime_type or ("application/pdf" if name.lower().endswith(".pdf") else "text/plain; charset=utf-8")
+    # inline: dibuka di tab browser, bukan langsung diunduh
+    return Response(content=data, media_type=media,
+                    headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(name)}"})
+
+
+@router.patch("/api/v1/corpus/documents/{doc_id}", response_model=ResponseWrapper[dict])
+def update_document(doc_id: str, body: DocumentUpdate, db: Session = Depends(get_db),
+                    user: AppUser = Depends(require("doc_status", "U"))):  # data dokumen: U = Analis Regulasi
+    """Perbaiki judul/jenis/penerbit kapan saja; nomor regulasi hanya selama belum pernah terbit
+    (versi terbit sudah disitasi kewajiban & laporan dengan nomor itu)."""
+    doc = _get(db, Document, doc_id)
+    before = {"canonical_number": doc.canonical_number, "title_id": doc.title_id,
+              "instrument_type": doc.instrument_type, "issuer": doc.issuer}
+    changes = {k: v.strip() for k, v in body.model_dump(exclude_none=True).items()}
+    if any(not v for v in changes.values()):
+        raise AppError(422, "VALIDATION_ERROR", "Isian tidak boleh kosong", {"fields": [k for k, v in changes.items() if not v]})
+    new_number = changes.get("canonical_number")
+    if new_number and new_number != doc.canonical_number:
+        frozen = db.scalar(select(func.count()).select_from(DocumentVersion).where(
+            DocumentVersion.document_id == doc.id, DocumentVersion.state.in_(("PUBLISHED", "WITHDRAWN"))))
+        if frozen:
+            raise AppError(409, "NUMBER_FROZEN", "Nomor regulasi tidak dapat diubah karena dokumen pernah terbit")
+        if db.scalar(select(Document.id).where(Document.canonical_number == new_number)):
+            raise AppError(409, "DUPLICATE", "Nomor regulasi sudah terdaftar")
+    for k, v in changes.items():
+        setattr(doc, k, v)
+    after = {k: getattr(doc, k) for k in before}
+    if after == before:
+        return ResponseWrapper(data={"id": str(doc.id), "changed": False})
+    audit(db, user.id, "DOCUMENT_UPDATED", "document", doc.id, before=before, after=after)
+    db.commit()
+    _share(db, doc.id)  # perubahan (termasuk ganti nomor) ikut dibagikan ke tim
+    return ResponseWrapper(data={"id": str(doc.id), "changed": True})
 
 
 @router.get("/api/v1/corpus/versions/{version_id}/provisions", response_model=ResponseWrapper[list])

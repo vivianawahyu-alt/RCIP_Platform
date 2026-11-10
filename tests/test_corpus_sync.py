@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from app.corpus import sync
-from tests.conftest import P, login
+from tests.conftest import ORIGIN, P, login
 
 
 @pytest.fixture()
@@ -36,7 +36,7 @@ def test_draft_is_shared_then_updates_and_deletions_follow(client, korpus):
         "canonical_number": f"POJK TEST/{tag}/Sinkron", "title_id": "Uji sinkron"}).json()["data"]["id"]
     body = f"Pasal 1\nBank wajib melaporkan {tag} setiap bulan.\nPasal 2\nPelanggaran dikenai sanksi."
     up = client.post(f"{P}/corpus/documents/{doc}/versions", headers=a, files={"file": ("s.txt", body.encode())},
-                     data={"effective_date": str(date.today())}).json()["data"]
+                     data={"effective_date": str(date.today()), "origin_url": ORIGIN}).json()["data"]
 
     # 1) ekspor otomatis: unggahan DRAF langsung tertulis ke data/korpus
     folder = next(korpus.iterdir())
@@ -69,7 +69,7 @@ def test_draft_is_shared_then_updates_and_deletions_follow(client, korpus):
     # 4) versi draf kedua dihapus di laptop asal → penanda hapus → laptop lain ikut menghapus
     up2 = client.post(f"{P}/corpus/documents/{doc}/versions", headers=a,
                       files={"file": ("s2.txt", (body + " v2").encode())},
-                      data={"effective_date": str(date.today())}).json()["data"]
+                      data={"effective_date": str(date.today()), "origin_url": ORIGIN}).json()["data"]
     _as_other_laptop(folder, other)
     assert sync.import_all()["versi_baru"] == 1
     assert len(_docs(client, a)[other]["versions"]) == 2
@@ -86,7 +86,7 @@ def test_deleted_draft_document_is_removed_elsewhere(client, korpus):
         "canonical_number": f"POJK TEST/{tag}/Hapus", "title_id": "Uji hapus"}).json()["data"]["id"]
     client.post(f"{P}/corpus/documents/{doc}/versions", headers=a,
                 files={"file": ("h.txt", f"Pasal 1\nIsi pasal {tag} cukup panjang.".encode())},
-                data={"effective_date": str(date.today())})
+                data={"effective_date": str(date.today()), "origin_url": ORIGIN})
     folder = next(korpus.iterdir())
     other = f"ZZZ UJI/{tag}"
     _as_other_laptop(folder, other)
@@ -104,3 +104,28 @@ def test_deleted_draft_document_is_removed_elsewhere(client, korpus):
     _as_other_laptop(folder, other)
     assert sync.import_all()["dokumen_dihapus"] == 1
     assert other not in _docs(client, a)
+
+def test_renamed_and_retitled_document_follow_elsewhere(client, korpus):
+    a = login(client, "analyst")
+    tag = uuid.uuid4().hex[:6]
+    doc = client.post(f"{P}/corpus/documents", headers=a, json={
+        "canonical_number": f"POJK TEST/{tag}/Lama", "title_id": "Judul lama"}).json()["data"]["id"]
+    old_folder = next(korpus.iterdir())
+    # ganti nomor & judul (masih draf) → folder nomor lama diberi penanda hapus, folder nomor baru dibuat
+    assert client.patch(f"{P}/corpus/documents/{doc}", headers=a,
+                        json={"canonical_number": f"POJK TEST/{tag}/Baru", "title_id": "Judul baru"}).status_code == 200
+    meta_old = json.loads((old_folder / "dokumen.json").read_text(encoding="utf-8"))
+    assert meta_old["deleted_at"]
+    new_folder = next(p for p in korpus.iterdir() if p != old_folder)
+    meta_new = json.loads((new_folder / "dokumen.json").read_text(encoding="utf-8"))
+    assert meta_new["title_id"] == "Judul baru" and meta_new["meta_updated_at"]
+
+    # "laptop lain" yang sudah punya dokumen ini (salinan) menerima judul terbaru
+    other = f"ZZZ UJI/{tag}"
+    meta_new["canonical_number"], meta_new["title_id"], meta_new["meta_updated_at"] = other, "Judul lama", "2000-01-01T00:00:00+00:00"
+    (new_folder / "dokumen.json").write_text(json.dumps(meta_new), encoding="utf-8")
+    sync.import_all()
+    meta_new["title_id"], meta_new["meta_updated_at"] = "Judul paling baru", "2999-01-01T00:00:00+00:00"
+    (new_folder / "dokumen.json").write_text(json.dumps(meta_new), encoding="utf-8")
+    assert sync.import_all()["dokumen_diperbarui"] == 1
+    assert _docs(client, a)[other]["title_id"] == "Judul paling baru"

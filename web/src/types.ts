@@ -5,8 +5,23 @@ export type User = { id: string; username: string; role: Role };
 export type Citation = { provision_version_id: string; canonical_number: string; number_label: string };
 export type Doc = { id: string; canonical_number: string; title_id: string; status: string; instrument_type: string; issuer?: string;
   labels?: { dimension: string; value: string; state: string }[];
+  created_at?: string;
+  // [A1] sumber asal dokumen (registri sumber, FR-RKM-001)
+  source?: { id: string; name: string; status: string } | null;
   // [9] extraction_method: "TEXT_LAYER" | "OCR" | "PLAIN_TEXT" (cara teks versi ini diperoleh)
-  versions: { id: string; version_number: number; state: string; effective_date: string; extraction_method?: string }[] };
+  // [A2] provenans versi: URL asal, nama & ukuran berkas, has_file = berkas asli tersimpan (bisa dibuka)
+  versions: { id: string; version_number: number; state: string; effective_date: string; extraction_method?: string;
+    origin_url?: string | null; file_name?: string | null; size_bytes?: number | null; has_file?: boolean }[] };
+// [A3] satu sumber regulasi pada registri (GET /corpus/sources)
+export type Source = { id: string; name: string; category: string; issuer_name: string; base_url: string; url_allow_list: string[];
+  status: string; permitted_use_statement?: string | null; citation_requirement_text?: string | null; created_by?: string | null;
+  submitted_by?: string | null; approved_by?: string | null; approved_at?: string | null; return_reason?: string | null; documents: number };
+// [A4] satu interaksi copilot (log FR-COP-004) beserta tinjauannya (FR-COP-005)
+export type CopilotReview = { id: string; state: "PENDING" | "COMPLETED"; requested_by?: string | null; requested_at?: string | null;
+  request_note?: string | null; reviewer?: string | null; verdict?: "CONFIRMED" | "CORRECTED" | "REJECTED" | null;
+  corrected_text?: string | null; reviewed_at?: string | null };
+export type Interaction = { id: string; question: string; user?: string | null; state?: string; confidence: number; low_confidence: boolean;
+  retrieved: any[]; template: string; model_id?: string | null; created_at?: string; review?: CopilotReview | null };
 export type Obligation = { id: string; state: string; summary: string; deadline: string | null; derived_from_ai: boolean;
   confidence?: number | null; owner_id?: string | null; owner?: string | null; validator?: string | null; approver?: string | null;
   frequency?: string | null; original_text?: string; created_at?: string; citation: Citation;

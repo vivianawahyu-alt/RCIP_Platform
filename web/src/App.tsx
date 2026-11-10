@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { api, hasToken, setToken } from "./api";
 import { canDo } from "./permissions";
 import type { Me } from "./types";
-import { ROLE_LABEL, canSeePage, fmtDate } from "./ui";
+import { PasalText, ROLE_LABEL, canSeePage, fmtDate } from "./ui";
 import type { Ctx } from "./ui";
 import { Beranda } from "./pages/Beranda";
 import { Regulasi, Perubahan } from "./pages/Regulasi";
@@ -16,13 +16,15 @@ import { Copilot } from "./pages/Copilot";
 import { Cari } from "./pages/Cari";
 import { Keberlakuan } from "./pages/Keberlakuan";
 import { Admin } from "./pages/Admin";
+import { Sumber } from "./pages/Sumber";  // [A19] halaman registri sumber regulasi
 
 type Item = { route: string; label: string; desc: string };
 const MENU: { label: string; items: Item[] }[] = [
   { label: "Pusat Regulasi", items: [
     { route: "regulasi", label: "Korpus & pasal", desc: "Dokumen, versi imutabel, dan teks pasal" },
+    { route: "sumber", label: "Sumber regulasi", desc: "Registri sumber & persetujuan penggunaan" },  // [A19]
     { route: "perubahan", label: "Perubahan regulasi", desc: "Bandingkan versi, deteksi perubahan material" },
-    { route: "copilot", label: "Tanya regulasi", desc: "Jawaban bersitasi dari korpus terbit" }] },
+    { route: "copilot", label: "Tanya regulasi", desc: "Jawaban bersitasi + antrean tinjauan" }] },
   { label: "Kepatuhan", items: [
     { route: "keberlakuan", label: "Keberlakuan", desc: "Apakah peraturan mengikat organisasi" },
     { route: "kewajiban", label: "Kewajiban", desc: "Draf AI, validasi, dan persetujuan" },
@@ -96,6 +98,7 @@ export default function App() {
       {canSeePage(me.role, page) && page === "beranda" && <Beranda ctx={ctx} />}
       {canSeePage(me.role, page) && page === "regulasi" && <Regulasi ctx={ctx} />}
       {canSeePage(me.role, page) && page === "perubahan" && <Perubahan ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "sumber" && <Sumber ctx={ctx} />}
       {canSeePage(me.role, page) && page === "keberlakuan" && <Keberlakuan ctx={ctx} />}
       {canSeePage(me.role, page) && page === "admin" && <Admin ctx={ctx} />}
       {canSeePage(me.role, page) && page === "kewajiban" && <Kewajiban ctx={ctx} />}
@@ -115,7 +118,7 @@ export default function App() {
       <div className="crumbs">{cite.document.issuer} · {cite.document.title_id}</div>
       <h2>{cite.document.canonical_number} — {cite.number_label}</h2>
       <p className="muted small">Versi {cite.document_version.version_number} ({cite.document_version.state}), berlaku {fmtDate(cite.document_version.effective_date)} · jalur {cite.hierarchical_path}</p>
-      <div className="verbatim">{cite.text}</div>
+      <PasalText text={cite.text} />{/* [A8] teks pasal per ayat/huruf */}
       <button className="btn primary" onClick={() => setCite(null)} autoFocus>Tutup</button>
     </div></div>}
   </>;
