@@ -147,10 +147,15 @@ def extract_text(filename: str, data: bytes) -> Extraction:  # [5b] sekarang men
     )
 
 
+DEFAULT_PERMITTED_USE = "Dokumen regulasi publik; dipakai untuk keperluan akademik capstone dengan sitasi sumber resmi."
+
+
 def get_or_create_source(db: Session, name: str, category: str, issuer: str, base_url: str) -> RegulatorySource:
+    """Dipakai seed & kompatibilitas lama. Sumber ACTIVE wajib punya pernyataan penggunaan (aturan DB migrasi 006)."""
     src = db.scalar(select(RegulatorySource).where(RegulatorySource.name == name))
     if not src:
-        src = RegulatorySource(name=name, category=category, issuer_name=issuer, base_url=base_url, status="ACTIVE")
+        src = RegulatorySource(name=name, category=category, issuer_name=issuer, base_url=base_url, status="ACTIVE",
+                               permitted_use_statement=DEFAULT_PERMITTED_USE, url_allow_list=[base_url])
         db.add(src)
         db.flush()
     return src
@@ -246,7 +251,8 @@ def ingest_version(db: Session, document: Document, filename: str, data: bytes, 
     ex = extract_text(filename, data)
     segments = segment_text(ex.text)  # pecah teks menjadi pasal-pasal
     if not segments:
-        raise AppError(422, "NO_PROVISIONS_FOUND", "Tidak ada Pasal terdeteksi pada dokumen")
+        raise AppError(422, "NO_PROVISIONS_FOUND",
+                       "Tidak ada Pasal (atau bagian bernomor romawi untuk Surat Edaran) yang terdeteksi pada dokumen")
     next_no = (db.scalar(select(func.max(DocumentVersion.version_number))
                          .where(DocumentVersion.document_id == document.id)) or 0) + 1
     dv = DocumentVersion(document_id=document.id, version_number=next_no, sha256=hashlib.sha256(data).hexdigest(),

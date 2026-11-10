@@ -10,6 +10,7 @@ from app.compliance.router import router as compliance_router
 from app.copilot.router import router as copilot_router
 from app.corpus.review import router as review_router
 from app.corpus.router import router as corpus_router
+from app.corpus.sources import router as sources_router  # FR-RKM-001 registri sumber
 from app.platform.router import router as platform_router
 from app.shared.config import settings
 from app.shared.errors import register_error_handlers
@@ -46,6 +47,7 @@ register_error_handlers(app)
 
 app.include_router(platform_router, prefix="/api/v1")
 app.include_router(corpus_router)
+app.include_router(sources_router)
 app.include_router(review_router)
 app.include_router(compliance_router)
 app.include_router(applicability_router)

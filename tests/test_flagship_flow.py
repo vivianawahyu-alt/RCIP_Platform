@@ -2,7 +2,7 @@
 import uuid
 from datetime import date, timedelta
 
-from tests.conftest import approve_applicability, login
+from tests.conftest import ORIGIN, approve_applicability, login
 
 P = "/api/v1"
 
@@ -19,9 +19,9 @@ def test_end_to_end(client):
     number = f"POJK TEST/{uuid.uuid4().hex[:6]}/Bank Umum"
     doc = client.post(f"{P}/corpus/documents", headers=analyst, json={
         "canonical_number": number, "title_id": "Manajemen Risiko Bank Umum"}).json()["data"]["id"]
-    body = "Pasal 1\nBank wajib menyampaikan laporan bulanan kepada regulator paling lambat 10 (sepuluh) hari kerja."
+    body = f"Dokumen uji {uuid.uuid4().hex}\nPasal 1\nBank wajib menyampaikan laporan bulanan kepada regulator paling lambat 10 (sepuluh) hari kerja."
     up = client.post(f"{P}/corpus/documents/{doc}/versions", headers=analyst,
-                     files={"file": ("t.txt", body.encode())}, data={"effective_date": str(date.today())})
+                     files={"file": ("t.txt", body.encode())}, data={"effective_date": str(date.today()), "origin_url": ORIGIN})
     assert up.status_code == 200, up.text
     vid = up.json()["data"]["version_id"]
     assert client.post(f"{P}/corpus/versions/{vid}/publish", headers=analyst).status_code == 200
@@ -58,7 +58,10 @@ def test_end_to_end(client):
     assert scan
     # pada DB baru, pemindaian juga memunculkan kesenjangan data seed milik pemilik lain → pilih temuan kewajiban ini
     mine = next(f for f in scan if client.get(f"{P}/compliance/findings/{f}", headers=officer).json()["data"]["obligation"]["id"] == ob)
+    # matriks RBAC "Tindakan remediasi": Pemilik Kontrol hanya R/U/X (own) — membuat tindakan (C) milik Pejabat Kepatuhan
     assert client.post(f"{P}/compliance/findings/{mine}/remediation", headers=owner,
+                       json={"description": "Buat kontrol", "due_date": str(date.today() + timedelta(days=30))}).status_code == 403
+    assert client.post(f"{P}/compliance/findings/{mine}/remediation", headers=officer,
                        json={"description": "Buat kontrol", "due_date": str(date.today() + timedelta(days=30))}).status_code == 200
 
     # 9-11 kontrol, bukti, asesmen

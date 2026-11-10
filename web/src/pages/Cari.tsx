@@ -1,10 +1,13 @@
 import { api } from "../api";
+import { canDo } from "../permissions";
 import type { Finding, Obligation } from "../types";
 import type { Ctx } from "../ui";
 import { Cite, Empty, PageHead, Sev, Status, useLoad } from "../ui";
 
 export function Cari({ ctx, kind, q }: { ctx: Ctx; kind: string; q: string }) {
-  const want = (k: string) => kind === "Semua" || kind === k;
+  // hanya jenis hasil yang boleh dibaca peran ini (Kewajiban = baca Obligation, Temuan = baca Finding)
+  const allowedKind = (k: string) => k === "Kewajiban" ? canDo(ctx.me.role, "obligation", "R") : k === "Temuan" ? canDo(ctx.me.role, "finding", "R") : true;
+  const want = (k: string) => (kind === "Semua" || kind === k) && allowedKind(k);
   const [hits] = useLoad<any[]>(() => want("Peraturan") ? api(`/corpus/search?q=${encodeURIComponent(q)}`) : Promise.resolve([]), [q, kind], ctx.notify);
   const [obs] = useLoad<Obligation[]>(() => want("Kewajiban") ? api("/compliance/obligations") : Promise.resolve([]), [q, kind], ctx.notify);
   const [fs] = useLoad<Finding[]>(() => want("Temuan") ? api("/compliance/findings") : Promise.resolve([]), [q, kind], ctx.notify);

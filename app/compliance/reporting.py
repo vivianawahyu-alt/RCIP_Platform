@@ -15,9 +15,9 @@ from app.compliance import services
 from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names
 from app.compliance.models import (Assessment, ComplianceReport, Control, Evidence, Finding, Obligation,
                                    ObligationControlMap, OrganisationProfile, RemediationAction)
-from app.platform.auth import current_user, require_roles
 from app.platform.governance import audit, record_approval
 from app.platform.models import AppUser, Approval
+from app.platform.permissions import allows, ensure_owner, own_only, require
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import ResponseWrapper
@@ -25,8 +25,16 @@ from app.shared import vocabularies as V
 
 router = APIRouter(prefix="/api/v1/compliance", tags=["reporting"])
 R = V.AppRole
-OFFICER = require_roles(R.COMPLIANCE_OFFICER)
-MANAGER = require_roles(R.COMPLIANCE_MANAGER)
+# Otorisasi = matriks RBAC (app/shared/rbac_matrix.py): "Compliance Report — hasilkan draf / terbitkan", "Laporan yang telah
+# diterbitkan", "Dasbor". Draf & laporan yang belum terbit hanya terlihat oleh peran dengan R pada "hasilkan draf".
+DRAFT_CREATE = require("report_draft", "C")           # Pejabat Kepatuhan
+DRAFT_UPDATE = require("report_draft", "U")
+ISSUE = require("report_issue", "A")                  # Manajer Kepatuhan (titik kendali #6)
+PUBLISHED_STATES = {V.ReportState.ISSUED.value, V.ReportState.SUPERSEDED.value}
+
+
+def _can_see_report(user: AppUser, r: ComplianceReport) -> bool:
+    return r.state in PUBLISHED_STATES or allows(user, "report_draft", "R")
 
 
 class ReportIn(BaseModel):
@@ -46,11 +54,11 @@ class ReasonIn(BaseModel):
 
 # ---------- dasbor ----------
 @router.get("/dashboard", response_model=ResponseWrapper[dict])
-def dashboard(db: Session = Depends(get_db), user: AppUser = Depends(current_user)):
+def dashboard(db: Session = Depends(get_db), user: AppUser = Depends(require("dashboard", "R"))):
     data = services.dashboard_metrics(db)
     # DRR-06: pembatasan lingkup dinyatakan di layar (MVP: angka organisasi, ditandai bila peran berlingkup)
     data["scope_note"] = ("Angka organisasi penuh. Sebagai Pemilik Bisnis/Kontrol, daftar temuan & tindakan Anda "
-                          "dibatasi pada objek milik Anda." if user.role == R.BUSINESS_CONTROL_OWNER.value else None)
+                          "dibatasi pada objek milik Anda." if own_only(user, "dashboard", "R") else None)
     return ResponseWrapper(data=data)
 
 
@@ -169,15 +177,19 @@ def report_dto(r: ComplianceReport, names: dict, full: bool = False) -> dict:
 
 # ---------- laporan ----------
 @router.get("/reports", response_model=ResponseWrapper[list])
-def list_reports(db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_reports(db: Session = Depends(get_db), user: AppUser = Depends(require("report_published", "R"))):
     names = user_names(db)
-    return ResponseWrapper(data=[report_dto(r, names) for r in
-                                 db.scalars(select(ComplianceReport).order_by(ComplianceReport.created_at.desc()))])
+    stmt = select(ComplianceReport).order_by(ComplianceReport.created_at.desc())
+    if not allows(user, "report_draft", "R"):  # peran lain: hanya laporan yang telah diterbitkan
+        stmt = stmt.where(ComplianceReport.state.in_(PUBLISHED_STATES))
+    return ResponseWrapper(data=[report_dto(r, names) for r in db.scalars(stmt)])
 
 
 @router.get("/reports/{rid}", response_model=ResponseWrapper[dict])
-def get_report(rid: str, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def get_report(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(require("report_published", "R"))):
     r = get_or_404(db, ComplianceReport, rid)
+    if not _can_see_report(user, r):
+        raise AppError(403, "FORBIDDEN", "Laporan ini belum diterbitkan; draf hanya dapat dibaca peran penyusun/peninjau")
     names = user_names(db)
     data = report_dto(r, names, full=True)
     data["approvals"] = [{"outcome": a.outcome, "checker": names.get(sid(a.checker_id)), "maker": names.get(sid(a.maker_id)),
@@ -187,7 +199,7 @@ def get_report(rid: str, db: Session = Depends(get_db), _: AppUser = Depends(cur
 
 
 @router.post("/reports", response_model=ResponseWrapper[dict])
-def create_report(body: ReportIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def create_report(body: ReportIn, db: Session = Depends(get_db), user: AppUser = Depends(DRAFT_CREATE)):
     """FR-DBR-006: Pejabat Kepatuhan membangkitkan draf; gagal bila ada angka/sitasi yang tak dapat ditelusuri."""
     title = require_text(body.title, "title")
     if body.period_start and body.period_end and body.period_start > body.period_end:
@@ -203,7 +215,7 @@ def create_report(body: ReportIn, db: Session = Depends(get_db), user: AppUser =
 
 
 @router.post("/reports/{rid}/regenerate", response_model=ResponseWrapper[dict])
-def regenerate_report(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def regenerate_report(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(DRAFT_UPDATE)):
     rep = get_or_404(db, ComplianceReport, rid)
     if rep.state != V.ReportState.DRAFT.value:
         raise AppError(409, "INVALID_STATE", f"Hanya laporan DRAFT yang dapat dibangkitkan ulang, bukan {rep.state}")
@@ -218,7 +230,7 @@ def regenerate_report(rid: str, db: Session = Depends(get_db), user: AppUser = D
 
 
 @router.post("/reports/{rid}/submit", response_model=ResponseWrapper[dict])
-def submit_report(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def submit_report(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(DRAFT_UPDATE)):
     rep = get_or_404(db, ComplianceReport, rid)
     if rep.state != V.ReportState.DRAFT.value:
         raise AppError(409, "INVALID_STATE", f"Laporan berstatus {rep.state}, bukan DRAFT")
@@ -233,7 +245,7 @@ def submit_report(rid: str, db: Session = Depends(get_db), user: AppUser = Depen
 
 
 @router.post("/reports/{rid}/decision", response_model=ResponseWrapper[dict])
-def decide_report(rid: str, body: DecisionIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def decide_report(rid: str, body: DecisionIn, db: Session = Depends(get_db), user: AppUser = Depends(ISSUE)):
     """DRR-10: penerbit harus berbeda dari pembangkit laporan."""
     rep = get_or_404(db, ComplianceReport, rid)
     if rep.state != V.ReportState.PENDING_APPROVAL.value:
@@ -263,7 +275,7 @@ def decide_report(rid: str, body: DecisionIn, db: Session = Depends(get_db), use
 
 
 @router.post("/reports/{rid}/withdraw", response_model=ResponseWrapper[dict])
-def withdraw_report(rid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def withdraw_report(rid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(ISSUE)):
     rep = get_or_404(db, ComplianceReport, rid)
     if rep.state != V.ReportState.ISSUED.value:
         raise AppError(409, "INVALID_STATE", f"Hanya laporan ISSUED yang dapat ditarik, bukan {rep.state}")
@@ -276,11 +288,13 @@ def withdraw_report(rid: str, body: ReasonIn, db: Session = Depends(get_db), use
 
 # ---------- drill-through ----------
 @router.get("/trace/obligations/{ob_id}", response_model=ResponseWrapper[dict])
-def trace(ob_id: str, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
-    """Rantai: pasal → versi → dokumen → kewajiban → persetujuan → kontrol → asesmen → bukti → temuan → remediasi."""
+def trace(ob_id: str, db: Session = Depends(get_db), user: AppUser = Depends(require("obligation", "R"))):
+    """Rantai: pasal → versi → dokumen → kewajiban → persetujuan → kontrol → asesmen → bukti → temuan → remediasi.
+    Mengikuti hak baca Obligation: Administrator tidak punya akses; Pemilik Bisnis/Kontrol hanya kewajiban miliknya."""
     from app.corpus.services import resolve_citations
 
     ob = get_or_404(db, Obligation, ob_id)
+    ensure_owner(user, "obligation", "R", ob.owner_id, "kewajiban ini")
     names = user_names(db)
     cite = resolve_citations(db, [str(ob.primary_citation_id)]).resolved[0]
     aps = db.scalars(select(Approval).where(Approval.object_id == ob.id).order_by(Approval.decided_at)).all()

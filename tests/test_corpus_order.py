@@ -73,3 +73,46 @@ TAMBAHAN LEMBARAN NEGARA REPUBLIK INDONESIA NOMOR 208"""
     assert "Agar" not in p3.text and "KETUA" not in p3.text            # penutup & tanda tangan tidak ikut
     assert pj2.provision_type == "PENJELASAN" and pj2.hierarchical_path == "Penjelasan/Pasal 2"
     assert "TAMBAHAN LEMBARAN" not in pj2.text
+
+def test_segmenter_amendment_regulation_keeps_inner_pasal():
+    # peraturan perubahan: hanya dipotong per Pasal romawi; "Pasal 5" di dalamnya adalah isi perubahan
+    text = """MEMUTUSKAN:
+Pasal I
+Beberapa ketentuan dalam POJK 1/2021 diubah sebagai berikut:
+1. Ketentuan Pasal 5 diubah sehingga berbunyi sebagai berikut:
+Pasal 5
+Laporan disampaikan paling lambat 5 (lima) hari kerja.
+Pasal II
+Peraturan ini mulai berlaku pada tanggal diundangkan.
+Agar setiap orang mengetahuinya, memerintahkan pengundangan."""
+    segs = segment_text(text)
+    assert [s.number_label for s in segs] == ["Pasal I", "Pasal II"]
+    assert "Pasal 5" in segs[0].text and "5 (lima) hari kerja" in segs[0].text
+
+
+def test_segmenter_ocr_pasal_I_in_normal_regulation_is_pasal_1():
+    # tanpa kata "diubah", "Pasal I" adalah salah baca OCR untuk "Pasal 1"
+    segs = segment_text("Pasal I\nIsi pasal satu cukup panjang.\nPasal 2\nIsi pasal dua cukup panjang.")
+    assert [s.number_label for s in segs] == ["Pasal 1", "Pasal 2"]
+
+
+def test_segmenter_circular_letter_sections_and_points():
+    text = """SURAT EDARAN OTORITAS JASA KEUANGAN
+Yth. Direksi Bank Umum
+I. KETENTUAN UMUM
+1. Dalam Surat Edaran ini yang dimaksud dengan Bank adalah bank umum.
+2. Bank wajib menyusun rencana strategis teknologi informasi.
+Rencana mencakup periode 2027 sampai 2029.
+II. PELAPORAN
+Bank menyampaikan laporan sebagai berikut:
+1. laporan tahunan paling lambat akhir Maret;
+2. laporan insiden paling lambat 24 jam.
+III. PENUTUP
+Ketentuan dalam Surat Edaran ini mulai berlaku pada tanggal ditetapkan.
+Ditetapkan di Jakarta"""
+    segs = segment_text(text)
+    assert [s.provision_key for s in segs] == ["BAGIAN-I-ANGKA-1", "BAGIAN-I-ANGKA-2", "BAGIAN-II", "BAGIAN-II-ANGKA-1",
+                                               "BAGIAN-II-ANGKA-2", "BAGIAN-III"]
+    assert segs[0].hierarchical_path == "Bagian I – Ketentuan Umum/Angka 1" and segs[0].provision_type == "ANGKA"
+    assert "periode 2027" in segs[1].text                        # baris lanjutan tetap di angka 2
+    assert "Ditetapkan" not in segs[-1].text                       # penutup tidak ikut

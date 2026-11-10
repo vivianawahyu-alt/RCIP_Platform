@@ -8,7 +8,7 @@ from datetime import date
 import pymupdf
 import pytest
 
-from tests.conftest import P, login
+from tests.conftest import ORIGIN, P, login
 
 
 def _doc(client, h):
@@ -35,9 +35,9 @@ def test_scanned_pdf_goes_through_ocr_and_requires_confirmation(client):
     a, auditor = login(client, "analyst"), login(client, "auditor")
     doc = _doc(client, a)
     pdf = _scanned_pdf(["Pasal 1", "Bank wajib menyampaikan laporan bulanan.", "Pasal 2",
-                        f"Laporan disampaikan paling lambat tanggal {uuid.uuid4().int % 28 + 1}."])
+                        f"Laporan disampaikan paling lambat tanggal {uuid.uuid4().int % 28 + 1}.", f"Kode {uuid.uuid4().hex[:8]}"])
     r = client.post(f"{P}/corpus/documents/{doc}/versions", headers=a, files={"file": ("pindaian.pdf", pdf)},
-                    data={"effective_date": str(date.today())})
+                    data={"effective_date": str(date.today()), "origin_url": ORIGIN})
     assert r.status_code == 200, r.text
     up = r.json()["data"]
     assert up["extraction_method"] == "OCR" and up["ocr_pages"] == [1]
@@ -82,7 +82,7 @@ def test_text_layer_pdf_is_not_flagged(client):
     page.insert_text((72, 100), "Pasal 1", fontsize=12)
     page.insert_text((72, 120), f"Bank wajib memelihara rasio likuiditas yang memadai setiap saat {uuid.uuid4().hex}.", fontsize=10)
     r = client.post(f"{P}/corpus/documents/{doc}/versions", headers=a, files={"file": ("teks.pdf", src.tobytes())},
-                    data={"effective_date": str(date.today())})
+                    data={"effective_date": str(date.today()), "origin_url": ORIGIN})
     assert r.status_code == 200, r.text
     assert r.json()["data"]["extraction_method"] == "TEXT_LAYER" and r.json()["data"]["ocr_pages"] == []
     vid = r.json()["data"]["version_id"]

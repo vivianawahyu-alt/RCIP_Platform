@@ -267,3 +267,16 @@ pre.answer { white-space: pre-wrap; font-family: var(--serif); font-size: 15.5px
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 mark { background: var(--seal-soft); color: inherit; border-bottom: 2px solid var(--seal); padding: 0 1px; }
+/* [A8] teks pasal per butir: penanda (1) / 1. / a. menggantung di kiri, isi rata kiri-kanan */
+.verbatim.pasal .pasal-para { margin: 0 0 6px; }
+.verbatim.pasal .pasal-item { display: flex; gap: 8px; margin: 0 0 6px; }
+.verbatim.pasal .pasal-mark { flex: 0 0 2.4em; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.verbatim.pasal .pasal-item > span:last-child { flex: 1; min-width: 0; }
+/* [A9] filter daftar dokumen */
+.doc-filter { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 10px; }
+.doc-filter .form-2 { gap: 8px; }
+.prov-meta { font-size: 12.5px; color: var(--muted); word-break: break-all; margin-top: 4px; }
+/* [A16] daftar keterangan dua kolom (dipakai halaman Sumber regulasi) */
+dl.kv { display: grid; grid-template-columns: minmax(120px, 34%) 1fr; gap: 4px 12px; margin: 0; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; word-break: break-word; }

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { api, hasToken, setToken } from "./api";
+import { canDo } from "./permissions";
 import type { Me } from "./types";
-import { ROLE_LABEL, fmtDate } from "./ui";
+import { PasalText, ROLE_LABEL, canSeePage, fmtDate } from "./ui";
 import type { Ctx } from "./ui";
 import { Beranda } from "./pages/Beranda";
 import { Regulasi, Perubahan } from "./pages/Regulasi";
@@ -15,13 +16,15 @@ import { Copilot } from "./pages/Copilot";
 import { Cari } from "./pages/Cari";
 import { Keberlakuan } from "./pages/Keberlakuan";
 import { Admin } from "./pages/Admin";
+import { Sumber } from "./pages/Sumber";  // [A19] halaman registri sumber regulasi
 
 type Item = { route: string; label: string; desc: string };
 const MENU: { label: string; items: Item[] }[] = [
   { label: "Pusat Regulasi", items: [
     { route: "regulasi", label: "Korpus & pasal", desc: "Dokumen, versi imutabel, dan teks pasal" },
+    { route: "sumber", label: "Sumber regulasi", desc: "Registri sumber & persetujuan penggunaan" },  // [A19]
     { route: "perubahan", label: "Perubahan regulasi", desc: "Bandingkan versi, deteksi perubahan material" },
-    { route: "copilot", label: "Tanya regulasi", desc: "Jawaban bersitasi dari korpus terbit" }] },
+    { route: "copilot", label: "Tanya regulasi", desc: "Jawaban bersitasi + antrean tinjauan" }] },
   { label: "Kepatuhan", items: [
     { route: "keberlakuan", label: "Keberlakuan", desc: "Apakah peraturan mengikat organisasi" },
     { route: "kewajiban", label: "Kewajiban", desc: "Draf AI, validasi, dan persetujuan" },
@@ -72,7 +75,7 @@ export default function App() {
     <div className="mainbar"><div className="wrap">
       <button className="wordmark" onClick={() => go("beranda")} aria-label="Beranda RCIP"><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
       <nav className="menu" aria-label="Menu utama">
-        {MENU.map(g => {
+        {MENU.map(g => ({ ...g, items: g.items.filter(i => canSeePage(me.role, i.route)) })).filter(g => g.items.length > 0).map(g => {
           const active = g.items.some(i => i.route === page);
           if (g.items.length === 1) return <div className="menu-group" key={g.label}><button className={active ? "active" : ""} onClick={() => go(g.items[0].route)}>{g.label}</button></div>;
           return <div key={g.label} className={`menu-group ${open === g.label ? "open" : ""}`} onClick={e => e.stopPropagation()}>
@@ -87,23 +90,25 @@ export default function App() {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari pasal, kewajiban, atau temuan — mis. laporan insiden TI" aria-label="Kata kunci pencarian" />
         <button type="submit">Cari</button>
       </form>
-      <div className="chips">{SEARCH_KINDS.map(k => <button key={k} type="button" className={`chip-filter ${k === kind ? "on" : ""}`} onClick={() => setKind(k)}>{k}</button>)}</div>
+      <div className="chips">{SEARCH_KINDS.filter(k => k === "Kewajiban" ? canDo(me.role, "obligation", "R") : k === "Temuan" ? canDo(me.role, "finding", "R") : true).map(k => <button key={k} type="button" className={`chip-filter ${k === kind ? "on" : ""}`} onClick={() => setKind(k)}>{k}</button>)}</div>
     </div></div>
     <main className="wrap">
       {msg && <div className={`notice ${msg.kind}`} role="status"><span>{msg.text}</span><button onClick={() => setMsg(null)}>Tutup</button></div>}
-      {page === "beranda" && <Beranda ctx={ctx} />}
-      {page === "regulasi" && <Regulasi ctx={ctx} />}
-      {page === "perubahan" && <Perubahan ctx={ctx} />}
-      {page === "keberlakuan" && <Keberlakuan ctx={ctx} />}
-      {page === "admin" && <Admin ctx={ctx} />}
-      {page === "kewajiban" && <Kewajiban ctx={ctx} />}
-      {page === "kontrol" && <Kontrol ctx={ctx} selected={param} />}
-      {page === "asesmen" && <Asesmen ctx={ctx} />}
-      {page === "temuan" && <Temuan ctx={ctx} selected={param} />}
-      {page === "laporan" && <Laporan ctx={ctx} selected={param} />}
-      {page === "audit" && <Audit ctx={ctx} />}
-      {page === "copilot" && <Copilot ctx={ctx} />}
-      {page === "cari" && <Cari ctx={ctx} kind={decodeURIComponent(param || "Semua")} q={decodeURIComponent(route.split("/").slice(2).join("/"))} />}
+      {!canSeePage(me.role, page) && (queueMicrotask(() => go("beranda")), null)}
+      {canSeePage(me.role, page) && page === "beranda" && <Beranda ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "regulasi" && <Regulasi ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "perubahan" && <Perubahan ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "sumber" && <Sumber ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "keberlakuan" && <Keberlakuan ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "admin" && <Admin ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "kewajiban" && <Kewajiban ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "kontrol" && <Kontrol ctx={ctx} selected={param} />}
+      {canSeePage(me.role, page) && page === "asesmen" && <Asesmen ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "temuan" && <Temuan ctx={ctx} selected={param} />}
+      {canSeePage(me.role, page) && page === "laporan" && <Laporan ctx={ctx} selected={param} />}
+      {canSeePage(me.role, page) && page === "audit" && <Audit ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "copilot" && <Copilot ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "cari" && <Cari ctx={ctx} kind={decodeURIComponent(param || "Semua")} q={decodeURIComponent(route.split("/").slice(2).join("/"))} />}
     </main>
     {/* Footer ringkas: nama aplikasi + program, rata tengah (lihat footer.site di styles.css) */}
     <footer className="site"><div className="wrap">
@@ -113,7 +118,7 @@ export default function App() {
       <div className="crumbs">{cite.document.issuer} · {cite.document.title_id}</div>
       <h2>{cite.document.canonical_number} — {cite.number_label}</h2>
       <p className="muted small">Versi {cite.document_version.version_number} ({cite.document_version.state}), berlaku {fmtDate(cite.document_version.effective_date)} · jalur {cite.hierarchical_path}</p>
-      <div className="verbatim">{cite.text}</div>
+      <PasalText text={cite.text} />{/* [A8] teks pasal per ayat/huruf */}
       <button className="btn primary" onClick={() => setCite(null)} autoFocus>Tutup</button>
     </div></div>}
   </>;

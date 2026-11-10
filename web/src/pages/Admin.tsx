@@ -2,11 +2,14 @@ import { useState } from "react";
 import { api } from "../api";
 import type { User } from "../types";
 import type { Ctx } from "../ui";
-import { Empty, PageHead, ROLE_LABEL, fmtTime, useAction, useLoad } from "../ui";
+import { Empty, PageHead, ROLE_LABEL, can, fmtTime, useAction, useLoad } from "../ui";
 
 export function Admin({ ctx }: { ctx: Ctx }) {
   const [cfg, reload] = useLoad<any[]>(() => api("/config"), [], ctx.notify);
-  const [users] = useLoad<User[]>(() => api("/users"), [], ctx.notify);
+  // Administrasi pengguna dan peran: Auditor = R, Administrator Sistem = C/R/U/D(soft) → /admin/users
+  const [users, reloadUsers] = useLoad<(User & { is_active: boolean; email: string })[]>(() => can(ctx.me.role, "user_admin_read") ? api("/admin/users") : Promise.resolve([]), [], ctx.notify);
+  const [nu, setNu] = useState({ username: "", email: "", password: "", role: "REGULATORY_ANALYST" });
+  const userAct = useAction(ctx.notify, reloadUsers);
   const canMetrics = ["SYSTEM_ADMINISTRATOR", "INTERNAL_AUDITOR"].includes(ctx.me.role);
   const [metrics] = useLoad<any>(() => canMetrics ? api("/metrics") : Promise.resolve(null), [], ctx.notify);
   const [edit, setEdit] = useState<Record<string, { value: string; why: string }>>({});
@@ -25,7 +28,16 @@ export function Admin({ ctx }: { ctx: Ctx }) {
       {!admin && <p className="hint">Hanya Administrator Sistem yang dapat mengubah parameter.</p>}
     </section>
     <div className="cols-even">
-      <section className="panel"><h2>Pengguna & peran</h2><ul className="list">{(users || []).map(u => <li key={u.id} className="between small"><b>{u.username}</b><span>{ROLE_LABEL[u.role]}</span></li>)}</ul></section>
+      <section className="panel"><h2>Pengguna & peran</h2><ul className="list">{(users || []).map(u => <li key={u.id} className="between small"><b>{u.username}{!u.is_active && " (nonaktif)"}</b>
+        <span className="row" style={{ gap: 6 }}>{ROLE_LABEL[u.role]}
+          {can(ctx.me.role, "user_admin_write") && u.id !== ctx.me.user_id && <button className="btn sm ghost" disabled={userAct.busy} onClick={() => userAct.run(() => api(`/admin/users/${u.id}`, { method: "PATCH", body: { is_active: !u.is_active } }), u.is_active ? "Akun dinonaktifkan." : "Akun diaktifkan.")}>{u.is_active ? "Nonaktifkan" : "Aktifkan"}</button>}</span></li>)}</ul>
+      {can(ctx.me.role, "user_admin_write") && <div className="form" style={{ marginTop: 10 }}>
+        <input placeholder="Username" value={nu.username} onChange={e => setNu({ ...nu, username: e.target.value })} />
+        <input placeholder="Email" value={nu.email} onChange={e => setNu({ ...nu, email: e.target.value })} />
+        <input type="password" placeholder="Password (min. 8 karakter)" value={nu.password} onChange={e => setNu({ ...nu, password: e.target.value })} />
+        <select value={nu.role} onChange={e => setNu({ ...nu, role: e.target.value })}>{Object.entries(ROLE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        <div><button className="btn primary" disabled={userAct.busy || !nu.username || !nu.email || nu.password.length < 8} onClick={() => userAct.run(async () => { await api("/admin/users", { body: nu }); setNu({ username: "", email: "", password: "", role: "REGULATORY_ANALYST" }); }, "Pengguna dibuat.")}>Tambah pengguna</button></div>
+      </div>}</section>
       {metrics && <section className="panel"><h2>Metrik layanan</h2><p className="small muted">Uptime {Math.round(metrics.uptime_seconds / 60)} menit</p>
         <ul className="list">{Object.entries(metrics.events).map(([k, v]) => <li key={k} className="between small"><span>{k}</span><b>{String(v)}</b></li>)}</ul>
         <h3 style={{ fontSize: 15, marginTop: 10 }}>Endpoint tersibuk</h3>

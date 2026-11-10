@@ -11,9 +11,9 @@ from app.ai import gateway
 from app.compliance.models import (Assessment, Control, Evidence, Finding, Obligation,
                                    ObligationControlMap, OrganisationProfile, Risk)
 from app.corpus.models import Document, DocumentVersion, Provision, ProvisionVersion
-from app.platform.auth import current_user, require_roles
 from app.platform.governance import audit, record_approval
 from app.platform.models import AiCallLog, AppUser
+from app.platform.permissions import allows, ensure_owner, own_only, require
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import ResponseWrapper
@@ -24,8 +24,7 @@ from app.shared.vocabularies import (AppRole, ApplicabilityValue, AssessmentStat
                                      ObligationState, OperatingResult, Severity)
 
 router = APIRouter(prefix="/api/v1/compliance", tags=["compliance"])
-OFFICER = require_roles(AppRole.COMPLIANCE_OFFICER)
-MANAGER = require_roles(AppRole.COMPLIANCE_MANAGER)
+# Otorisasi = matriks RBAC (app/shared/rbac_matrix.py); tiap endpoint menyebut kapabilitas + huruf aksi pada tabel.
 
 
 def _get(db: Session, model, id_):
@@ -81,7 +80,7 @@ class ControlIn(BaseModel):
 
 # ---------- profil & keberlakuan ----------
 @router.post("/profiles", response_model=ResponseWrapper[dict])
-def create_profile(body: ProfileIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def create_profile(body: ProfileIn, db: Session = Depends(get_db), user: AppUser = Depends(require("org_profile", "C"))):
     p = OrganisationProfile(**body.model_dump())
     db.add(p)
     db.flush()
@@ -92,7 +91,8 @@ def create_profile(body: ProfileIn, db: Session = Depends(get_db), user: AppUser
 
 # ---------- kewajiban ----------
 @router.post("/obligations/extract", response_model=ResponseWrapper[dict])
-def extract(body: ExtractIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def extract(body: ExtractIn, db: Session = Depends(get_db),
+            user: AppUser = Depends(require("obligation", "C"))):  # Analis: C/draft (hanya AI_DRAFT, memang itu keluaran endpoint ini); Pejabat: C
     pv = _get(db, ProvisionVersion, body.provision_version_id)
     dv = db.get(DocumentVersion, pv.document_version_id)
     if dv.state != "PUBLISHED":
@@ -141,14 +141,17 @@ def extract(body: ExtractIn, db: Session = Depends(get_db), user: AppUser = Depe
 
 
 @router.get("/obligations", response_model=ResponseWrapper[list])
-def list_obligations(db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_obligations(db: Session = Depends(get_db), user: AppUser = Depends(require("obligation", "R"))):
     names = user_names(db)
-    rows = db.execute(select(Obligation, Provision, Document)
-                      .join(ProvisionVersion, ProvisionVersion.id == Obligation.primary_citation_id)
-                      .join(Provision, Provision.id == ProvisionVersion.provision_id)
-                      .join(DocumentVersion, DocumentVersion.id == ProvisionVersion.document_version_id)
-                      .join(Document, Document.id == DocumentVersion.document_id)
-                      .order_by(Obligation.created_at.desc())).all()
+    stmt = (select(Obligation, Provision, Document)
+            .join(ProvisionVersion, ProvisionVersion.id == Obligation.primary_citation_id)
+            .join(Provision, Provision.id == ProvisionVersion.provision_id)
+            .join(DocumentVersion, DocumentVersion.id == ProvisionVersion.document_version_id)
+            .join(Document, Document.id == DocumentVersion.document_id)
+            .order_by(Obligation.created_at.desc()))
+    if own_only(user, "obligation", "R"):  # Pemilik Bisnis/Kontrol: R (own) → hanya kewajiban yang ia miliki
+        stmt = stmt.where(Obligation.owner_id == user.id)
+    rows = db.execute(stmt).all()
     return ResponseWrapper(data=[{
         "id": str(o.id), "state": o.state, "summary": o.plain_language_summary, "deadline": o.deadline_expression,
         "confidence": float(o.confidence) if o.confidence is not None else None, "derived_from_ai": o.derived_from_ai,
@@ -174,7 +177,8 @@ def _ai_meta(db: Session, call_id):
 
 
 @router.post("/obligations/{ob_id}/reopen", response_model=ResponseWrapper[dict])
-def reopen_obligation(ob_id: str, body: ReopenIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def reopen_obligation(ob_id: str, body: ReopenIn, db: Session = Depends(get_db),
+                      user: AppUser = Depends(require("obligation", "U"))):
     """W8: REVIEW_REQUIRED → IN_VALIDATION. Opsional: arahkan sitasi ke ketentuan yang sama pada versi terbit terbaru."""
     ob = _get(db, Obligation, ob_id)
     if ob.state != ObligationState.REVIEW_REQUIRED.value:
@@ -198,7 +202,8 @@ def reopen_obligation(ob_id: str, body: ReopenIn, db: Session = Depends(get_db),
 
 
 @router.post("/obligations/{ob_id}/validate", response_model=ResponseWrapper[dict])
-def validate(ob_id: str, body: ValidateIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def validate(ob_id: str, body: ValidateIn, db: Session = Depends(get_db),
+             user: AppUser = Depends(require("obligation", "U"))):  # validasi rekaman terstruktur: U = Pejabat, Peninjau Hukum
     ob = _get(db, Obligation, ob_id)
     if ob.state not in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value):
         raise AppError(409, "INVALID_STATE", f"Kewajiban berstatus {ob.state}")
@@ -218,7 +223,8 @@ def validate(ob_id: str, body: ValidateIn, db: Session = Depends(get_db), user: 
 
 
 @router.post("/obligations/{ob_id}/decision", response_model=ResponseWrapper[dict])
-def decide(ob_id: str, body: DecisionIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def decide(ob_id: str, body: DecisionIn, db: Session = Depends(get_db),
+           user: AppUser = Depends(require("obligation", "A"))):  # persetujuan: Manajer Kepatuhan (titik kendali #3)
     ob = _get(db, Obligation, ob_id)
     if ob.state != ObligationState.PENDING_APPROVAL.value:
         raise AppError(409, "INVALID_STATE", f"Kewajiban berstatus {ob.state}, bukan PENDING_APPROVAL")
@@ -256,7 +262,7 @@ class ControlOwnerIn(BaseModel):
     owner_id: str
 
 
-def _control_dto(db: Session, c: Control, names: dict) -> dict:
+def _control_dto(db: Session, c: Control, names: dict, with_assessment: bool = True) -> dict:
     mapped = db.scalars(select(ObligationControlMap.obligation_id).where(ObligationControlMap.control_id == c.id)).all()
     ev = db.execute(select(Evidence.state, func.count()).where(Evidence.control_id == c.id).group_by(Evidence.state)).all()
     ev = {k: v for k, v in ev}
@@ -269,9 +275,10 @@ def _control_dto(db: Session, c: Control, names: dict) -> dict:
         "obligation_id": str(mapped[0]) if mapped else None, "obligation_ids": [str(m) for m in mapped],
         "evidence_count": int(sum(ev.values())), "evidence_accepted": int(ev.get("ACCEPTED", 0)),
         "evidence_pending": int(ev.get("SUBMITTED", 0)),
-        "latest_assessment": latest.operating_result or latest.result if latest else None,
-        "latest_assessment_state": latest.state if latest else None,
-        "latest_assessment_id": sid(latest.id) if latest else None,
+        # kesimpulan asesmen hanya untuk peran yang punya R pada "Kesimpulan/pengesahan asesmen" (CO, LR, CM, IA, EX)
+        "latest_assessment": (latest.operating_result or latest.result if latest else None) if with_assessment else None,
+        "latest_assessment_state": (latest.state if latest else None) if with_assessment else None,
+        "latest_assessment_id": (sid(latest.id) if latest else None) if with_assessment else None,
         "source_changed": bool(c.source_changed),
     }
 
@@ -288,7 +295,7 @@ def _assessment_dto(a: Assessment, names: dict, control: Optional[Control] = Non
 
 
 @router.get("/risks", response_model=ResponseWrapper[list])
-def list_risks(db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_risks(db: Session = Depends(get_db), _: AppUser = Depends(require("risk", "R"))):
     rows = db.execute(select(Risk, Obligation).join(Obligation, Obligation.id == Risk.obligation_id)
                       .order_by(Risk.id.desc())).all()
     return ResponseWrapper(data=[{
@@ -298,28 +305,37 @@ def list_risks(db: Session = Depends(get_db), _: AppUser = Depends(current_user)
 
 
 @router.get("/controls", response_model=ResponseWrapper[list])
-def list_controls(db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_controls(db: Session = Depends(get_db), user: AppUser = Depends(require("control_library", "R"))):
     names = user_names(db)
-    return ResponseWrapper(data=[_control_dto(db, c, names) for c in db.scalars(select(Control).order_by(Control.title))])
+    stmt = select(Control).order_by(Control.title)
+    if own_only(user, "control_library", "R"):  # Pemilik Bisnis/Kontrol: R (own) → hanya kontrol yang ia miliki
+        stmt = stmt.where(Control.owner_id == user.id)
+    wa = allows(user, "assessment_conclusion", "R")
+    return ResponseWrapper(data=[_control_dto(db, c, names, wa) for c in db.scalars(stmt)])
 
 
 @router.get("/controls/{control_id}", response_model=ResponseWrapper[dict])
-def control_detail(control_id: str, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def control_detail(control_id: str, db: Session = Depends(get_db), user: AppUser = Depends(require("control_library", "R"))):
     from app.compliance.findings import _evidence_dto
 
     c = _get(db, Control, control_id)
+    ensure_owner(user, "control_library", "R", c.owner_id, "kontrol ini")  # R (own) untuk Pemilik Bisnis/Kontrol
     names = user_names(db)
-    data = _control_dto(db, c, names)
+    wa = allows(user, "assessment_conclusion", "R")
+    data = _control_dto(db, c, names, wa)
+    # daftar bukti & asesmen hanya untuk peran yang memang berhak membacanya (Akses bukti / Kesimpulan asesmen)
+    can_evidence = allows(user, "evidence_access", "R") or allows(user, "evidence_upload", "R")
     data["evidence"] = [_evidence_dto(e, names) for e in
-                        db.scalars(select(Evidence).where(Evidence.control_id == c.id).order_by(Evidence.uploaded_at.desc()))]
+                        db.scalars(select(Evidence).where(Evidence.control_id == c.id).order_by(Evidence.uploaded_at.desc()))
+                        ] if can_evidence else []
     data["assessments"] = [_assessment_dto(a, names, c) for a in
                            db.scalars(select(Assessment).where(Assessment.control_id == c.id)
-                                      .order_by(Assessment.assessed_at.desc()))]
+                                      .order_by(Assessment.assessed_at.desc()))] if wa else []
     return ResponseWrapper(data=data)
 
 
 @router.post("/risks", response_model=ResponseWrapper[dict])
-def create_risk(body: RiskIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def create_risk(body: RiskIn, db: Session = Depends(get_db), user: AppUser = Depends(require("risk", "C"))):
     ob = _get(db, Obligation, body.obligation_id)
     if ob.state in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value):
         raise AppError(409, "AI_DRAFT_BLOCKED", "Risiko tidak dapat ditautkan ke kewajiban yang belum divalidasi")
@@ -334,7 +350,8 @@ def create_risk(body: RiskIn, db: Session = Depends(get_db), user: AppUser = Dep
 
 
 @router.post("/controls", response_model=ResponseWrapper[dict])
-def create_control(body: ControlIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def create_control(body: ControlIn, db: Session = Depends(get_db),
+                   user: AppUser = Depends(require("control_library", "C"))):
     if body.owner_id:
         _get(db, AppUser, body.owner_id)
     if body.risk_id:
@@ -348,7 +365,8 @@ def create_control(body: ControlIn, db: Session = Depends(get_db), user: AppUser
 
 
 @router.post("/controls/{control_id}/owner", response_model=ResponseWrapper[dict])
-def set_control_owner(control_id: str, body: ControlOwnerIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def set_control_owner(control_id: str, body: ControlOwnerIn, db: Session = Depends(get_db),
+                      user: AppUser = Depends(require("control_owner", "U"))):  # Penetapan Control Owner: Pejabat Kepatuhan
     c = _get(db, Control, control_id)
     _get(db, AppUser, body.owner_id)
     before = {"owner_id": sid(c.owner_id)}
@@ -359,7 +377,8 @@ def set_control_owner(control_id: str, body: ControlOwnerIn, db: Session = Depen
 
 
 @router.post("/obligations/{ob_id}/controls/{control_id}", response_model=ResponseWrapper[dict])
-def map_control(ob_id: str, control_id: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def map_control(ob_id: str, control_id: str, db: Session = Depends(get_db),
+                user: AppUser = Depends(require("control_library", "U"))):
     ob, ctl = _get(db, Obligation, ob_id), _get(db, Control, control_id)
     if ob.state in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value):
         raise AppError(409, "AI_DRAFT_BLOCKED", "Kewajiban belum divalidasi manusia; pemetaan kontrol diblokir")
@@ -379,20 +398,19 @@ def map_control(ob_id: str, control_id: str, db: Session = Depends(get_db), user
 @router.post("/controls/{control_id}/evidence", response_model=ResponseWrapper[dict])
 async def upload_evidence(control_id: str, file: UploadFile = File(...), description: str = Form(""),
                           db: Session = Depends(get_db),
-                          user: AppUser = Depends(require_roles(AppRole.BUSINESS_CONTROL_OWNER, AppRole.COMPLIANCE_OFFICER))):
+                          user: AppUser = Depends(require("evidence_upload", "C"))):  # Unggah bukti: Pejabat; Pemilik (own)
     from app.compliance.findings import store_evidence
 
     ctl = _get(db, Control, control_id)
-    # R-05: Pemilik Bisnis/Kontrol hanya untuk kontrol miliknya
-    if user.role == AppRole.BUSINESS_CONTROL_OWNER.value and str(ctl.owner_id) != str(user.id):
-        raise AppError(403, "OUT_OF_SCOPE", "Anda bukan pemilik kontrol ini")
+    ensure_owner(user, "evidence_upload", "C", ctl.owner_id, "kontrol ini")  # R-05: Pemilik hanya untuk kontrol miliknya
     ev = await store_evidence(db, file, user, description=description, control_id=ctl.id)
     db.commit()
     return ResponseWrapper(data={"id": str(ev.id), "sha256": ev.sha256, "state": ev.state})
 
 
 @router.get("/assessments", response_model=ResponseWrapper[list])
-def list_assessments(state: Optional[str] = None, db: Session = Depends(get_db), _: AppUser = Depends(current_user)):
+def list_assessments(state: Optional[str] = None, db: Session = Depends(get_db),
+                     _: AppUser = Depends(require("assessment_conclusion", "R"))):
     names = user_names(db)
     stmt = select(Assessment, Control).join(Control, Control.id == Assessment.control_id).order_by(Assessment.assessed_at.desc())
     if state:
@@ -401,7 +419,8 @@ def list_assessments(state: Optional[str] = None, db: Session = Depends(get_db),
 
 
 @router.post("/controls/{control_id}/assessments", response_model=ResponseWrapper[dict])
-def assess(control_id: str, body: AssessmentIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def assess(control_id: str, body: AssessmentIn, db: Session = Depends(get_db),
+           user: AppUser = Depends(require("assessment_conclusion", "C"))):
     ctl = _get(db, Control, control_id)
     design = body.design_result.value if body.design_result else (body.result.value if body.result else None)
     operating = body.operating_result.value if body.operating_result else (body.result.value if body.result else None)
@@ -452,7 +471,8 @@ def assess(control_id: str, body: AssessmentIn, db: Session = Depends(get_db), u
 
 
 @router.post("/assessments/{aid}/submit", response_model=ResponseWrapper[dict])
-def submit_assessment(aid: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def submit_assessment(aid: str, db: Session = Depends(get_db),
+                      user: AppUser = Depends(require("assessment_conclusion", "U"))):
     a = _get(db, Assessment, aid)
     if a.state != AssessmentState.CONCLUDED.value:
         raise AppError(409, "INVALID_STATE", f"Asesmen berstatus {a.state}, bukan CONCLUDED")
@@ -463,7 +483,8 @@ def submit_assessment(aid: str, db: Session = Depends(get_db), user: AppUser = D
 
 
 @router.post("/assessments/{aid}/signoff", response_model=ResponseWrapper[dict])
-def signoff_assessment(aid: str, body: SignoffIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def signoff_assessment(aid: str, body: SignoffIn, db: Session = Depends(get_db),
+                       user: AppUser = Depends(require("assessment_conclusion", "A"))):
     """Titik kendali #4: pemberi sign-off ≠ asesor dan ≠ pengaju."""
     a = _get(db, Assessment, aid)
     if a.state != AssessmentState.PENDING_SIGNOFF.value:

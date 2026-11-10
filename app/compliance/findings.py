@@ -16,9 +16,9 @@ from sqlalchemy.orm import Session
 from app.compliance.common import get_or_404, iso, now, require_text, sid, today, user_names
 from app.compliance.models import Control, Evidence, Finding, Obligation, RemediationAction
 from app.corpus.models import Document, DocumentVersion, Provision, ProvisionVersion
-from app.platform.auth import current_user, require_roles
 from app.platform.governance import audit, record_approval
 from app.platform.models import AppUser, Approval, AuditEvent
+from app.platform.permissions import own_only, require
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import ResponseWrapper
@@ -29,9 +29,23 @@ from app.platform.config_service import get_value, window_days
 
 router = APIRouter(prefix="/api/v1/compliance", tags=["findings"])
 R = V.AppRole
-OFFICER = require_roles(R.COMPLIANCE_OFFICER)
-MANAGER = require_roles(R.COMPLIANCE_MANAGER)
-OFFICER_OR_OWNER = require_roles(R.COMPLIANCE_OFFICER, R.BUSINESS_CONTROL_OWNER)
+# Otorisasi = matriks RBAC (app/shared/rbac_matrix.py). Pemilik Bisnis/Kontrol hanya "RUX (own)" pada Tindakan remediasi:
+# ia TIDAK boleh membuat tindakan, mengajukan penutupan, atau memindai kesenjangan — itu milik Pejabat Kepatuhan.
+FINDING_READ = require("finding", "R")                       # CO, BCO(own), CM, IA, EX
+FINDING_CREATE = require("finding", "C")                     # Pejabat Kepatuhan (termasuk pindai kesenjangan)
+FINDING_APPROVE = require("finding", "A")                    # Manajer: terima risiko
+ACTION_CREATE = require("remediation", "C")                  # Pejabat Kepatuhan
+# Mulai/selesaikan tindakan = perubahan status → huruf U (dimiliki Pejabat "CRU" dan Pemilik "RUX/own"). Huruf X milik Pemilik
+# tidak dipakai sendirian di sini karena Pejabat (tanpa X) tetap harus bisa menjalankan tindakan yang ia miliki sendiri.
+ACTION_EXECUTE = require("remediation", "U")
+ACTION_UPDATE = require("remediation", "U")                  # Pejabat; Pemilik (own): perpanjang tenggat
+ACTION_CANCEL = require("remediation", "U", only=[R.COMPLIANCE_OFFICER])
+EVIDENCE_UPLOAD = require("evidence_upload", "C")            # Pejabat; Pemilik (own)
+EVIDENCE_REVIEW = require("evidence_request", "U")           # Pejabat menerima/menolak bukti
+EVIDENCE_READ = require("evidence_access", "R")              # RA, CO, BCO(own), LR, CM, IA
+CLOSURE_PROPOSE = require("finding_closure", "C")            # Pejabat: C/propose (hanya mengusulkan)
+CLOSURE_DECIDE = require("finding_closure", "A")             # Manajer Kepatuhan (titik kendali #5)
+FINDING_REOPEN = require("finding_reopen", "X")              # Manajer Kepatuhan
 TERMINAL = {V.FindingState.CLOSED.value, V.FindingState.RISK_ACCEPTED.value}
 
 
@@ -98,7 +112,8 @@ def validate_due_date(db: Session, severity: str, due: date, base: Optional[date
 
 
 def _is_owner_scope(user: AppUser) -> bool:
-    return user.role == R.BUSINESS_CONTROL_OWNER.value
+    """True bila peran ini dibatasi 'R (own)' pada Finding (Pemilik Bisnis/Kontrol) — dibaca dari matriks RBAC."""
+    return own_only(user, "finding", "R")
 
 
 def _owns_finding(db: Session, f: Finding, user: AppUser) -> bool:
@@ -115,11 +130,9 @@ def _check_scope(db: Session, f: Finding, user: AppUser) -> None:
 
 
 def _action_actor(db: Session, a: RemediationAction, user: AppUser) -> None:
-    if user.role == R.COMPLIANCE_OFFICER.value:
-        return
-    if user.role == R.BUSINESS_CONTROL_OWNER.value and str(a.owner_id) == str(user.id):
-        return
-    raise AppError(403, "FORBIDDEN", "Hanya pemilik tindakan atau Pejabat Kepatuhan yang dapat melakukan aksi ini")
+    """Peran sudah lolos matriks di dependency endpoint; di sini hanya lingkup 'own' (RUX/own) yang diperiksa."""
+    if own_only(user, "remediation", "X") and str(a.owner_id) != str(user.id):
+        raise AppError(403, "FORBIDDEN", "Hanya pemilik tindakan atau Pejabat Kepatuhan yang dapat melakukan aksi ini")
 
 
 def _set_state(db: Session, f: Finding, new: str, user: AppUser, action: str, extra: Optional[dict] = None) -> None:
@@ -200,7 +213,7 @@ def finding_dto(db: Session, f: Finding, names: dict, with_actions: bool = True)
 # ---------- register & detail ----------
 @router.get("/findings", response_model=ResponseWrapper[list])
 def list_findings(severity: Optional[str] = None, state: Optional[str] = None, owner_id: Optional[str] = None,
-                  overdue: Optional[bool] = None, db: Session = Depends(get_db), user: AppUser = Depends(current_user)):
+                  overdue: Optional[bool] = None, db: Session = Depends(get_db), user: AppUser = Depends(FINDING_READ)):
     stmt = select(Finding).order_by(Finding.created_at.desc())
     if severity:
         stmt = stmt.where(Finding.severity == severity)
@@ -219,7 +232,7 @@ def list_findings(severity: Optional[str] = None, state: Optional[str] = None, o
 
 
 @router.get("/findings/{fid}", response_model=ResponseWrapper[dict])
-def finding_detail(fid: str, db: Session = Depends(get_db), user: AppUser = Depends(current_user)):
+def finding_detail(fid: str, db: Session = Depends(get_db), user: AppUser = Depends(FINDING_READ)):
     f = get_or_404(db, Finding, fid)
     _check_scope(db, f, user)
     names = user_names(db)
@@ -240,7 +253,7 @@ def finding_detail(fid: str, db: Session = Depends(get_db), user: AppUser = Depe
 
 
 @router.post("/findings", response_model=ResponseWrapper[dict])
-def create_finding(body: FindingIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def create_finding(body: FindingIn, db: Session = Depends(get_db), user: AppUser = Depends(FINDING_CREATE)):
     """FR-EVR-004: temuan manual wajib tertaut ke kewajiban, memiliki severity dan pemilik."""
     ob = get_or_404(db, Obligation, body.obligation_id)
     if ob.state in (V.ObligationState.AI_DRAFT.value, V.ObligationState.IN_VALIDATION.value):
@@ -262,8 +275,7 @@ def create_finding(body: FindingIn, db: Session = Depends(get_db), user: AppUser
 
 
 @router.post("/gaps/scan", response_model=ResponseWrapper[dict])
-def scan(db: Session = Depends(get_db),
-         user: AppUser = Depends(require_roles(R.COMPLIANCE_OFFICER, R.COMPLIANCE_MANAGER))):
+def scan(db: Session = Depends(get_db), user: AppUser = Depends(FINDING_CREATE)):  # membuat Finding = C → hanya Pejabat
     created = services.scan_gaps_create_findings(db, user.id)
     for f in created:
         audit(db, user.id, "FINDING_AUTO_RAISED", "finding", f.id, after={"source_type": f.source_type})
@@ -273,7 +285,7 @@ def scan(db: Session = Depends(get_db),
 
 # ---------- remediasi ----------
 @router.post("/findings/{fid}/remediation", response_model=ResponseWrapper[dict])
-def create_action(fid: str, body: RemediationIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_OR_OWNER)):
+def create_action(fid: str, body: RemediationIn, db: Session = Depends(get_db), user: AppUser = Depends(ACTION_CREATE)):
     f = get_or_404(db, Finding, fid)
     _check_scope(db, f, user)
     if f.state in TERMINAL or f.state == V.FindingState.PENDING_CLOSURE_VALIDATION.value:
@@ -295,7 +307,7 @@ def create_action(fid: str, body: RemediationIn, db: Session = Depends(get_db), 
 
 
 @router.post("/actions/{aid}/start", response_model=ResponseWrapper[dict])
-def start_action(aid: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_OR_OWNER)):
+def start_action(aid: str, db: Session = Depends(get_db), user: AppUser = Depends(ACTION_EXECUTE)):
     a = get_or_404(db, RemediationAction, aid)
     _action_actor(db, a, user)
     if a.state != V.ActionState.OPEN.value:
@@ -310,7 +322,7 @@ def start_action(aid: str, db: Session = Depends(get_db), user: AppUser = Depend
 
 
 @router.post("/actions/{aid}/extend", response_model=ResponseWrapper[dict])
-def extend_action(aid: str, body: ExtendIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_OR_OWNER)):
+def extend_action(aid: str, body: ExtendIn, db: Session = Depends(get_db), user: AppUser = Depends(ACTION_UPDATE)):
     """BR-EVR-005-3: perpanjangan tidak menimpa tanggal asli; riwayat dipertahankan."""
     a = get_or_404(db, RemediationAction, aid)
     _action_actor(db, a, user)
@@ -333,7 +345,7 @@ def extend_action(aid: str, body: ExtendIn, db: Session = Depends(get_db), user:
 
 @router.post("/actions/{aid}/evidence", response_model=ResponseWrapper[dict])
 async def upload_action_evidence(aid: str, file: UploadFile = File(...), description: str = Form(""),
-                                 db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_OR_OWNER)):
+                                 db: Session = Depends(get_db), user: AppUser = Depends(EVIDENCE_UPLOAD)):
     a = get_or_404(db, RemediationAction, aid)
     _action_actor(db, a, user)
     if a.state in (V.ActionState.DONE.value, V.ActionState.CANCELLED.value):
@@ -368,7 +380,7 @@ async def store_evidence(db: Session, file: UploadFile, user: AppUser, *, descri
 
 
 @router.post("/evidence/{eid}/review", response_model=ResponseWrapper[dict])
-def review_evidence(eid: str, body: EvidenceReviewIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def review_evidence(eid: str, body: EvidenceReviewIn, db: Session = Depends(get_db), user: AppUser = Depends(EVIDENCE_REVIEW)):
     """FR-EVR-003: penerimaan/penolakan wajib rasional; bukti ACCEPTED menjadi imutabel."""
     ev = get_or_404(db, Evidence, eid)
     if ev.state != V.EvidenceState.SUBMITTED.value:
@@ -385,12 +397,9 @@ def review_evidence(eid: str, body: EvidenceReviewIn, db: Session = Depends(get_
 
 
 @router.get("/evidence/{eid}/download")
-def download_evidence(eid: str, db: Session = Depends(get_db),
-                      user: AppUser = Depends(require_roles(R.REGULATORY_ANALYST, R.COMPLIANCE_OFFICER,
-                                                            R.BUSINESS_CONTROL_OWNER, R.LEGAL_REVIEWER,
-                                                            R.COMPLIANCE_MANAGER, R.INTERNAL_AUDITOR))):
+def download_evidence(eid: str, db: Session = Depends(get_db), user: AppUser = Depends(EVIDENCE_READ)):
     ev = get_or_404(db, Evidence, eid)
-    if _is_owner_scope(user):
+    if own_only(user, "evidence_access", "R"):  # Akses bukti: Pemilik hanya "own scope"
         own = str(ev.uploaded_by) == str(user.id)
         if ev.control_id:
             c = db.get(Control, ev.control_id)
@@ -410,7 +419,7 @@ def download_evidence(eid: str, db: Session = Depends(get_db),
 
 
 @router.post("/actions/{aid}/complete", response_model=ResponseWrapper[dict])
-def complete_action(aid: str, body: NoteIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_OR_OWNER)):
+def complete_action(aid: str, body: NoteIn, db: Session = Depends(get_db), user: AppUser = Depends(ACTION_EXECUTE)):
     """BR-EVR-005-2: tindakan tidak dapat selesai tanpa bukti penutupan berstatus ACCEPTED."""
     a = get_or_404(db, RemediationAction, aid)
     _action_actor(db, a, user)
@@ -434,7 +443,7 @@ def complete_action(aid: str, body: NoteIn, db: Session = Depends(get_db), user:
 
 
 @router.post("/actions/{aid}/cancel", response_model=ResponseWrapper[dict])
-def cancel_action(aid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER)):
+def cancel_action(aid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(ACTION_CANCEL)):
     a = get_or_404(db, RemediationAction, aid)
     if a.state not in (V.ActionState.OPEN.value, V.ActionState.IN_PROGRESS.value):
         raise AppError(409, "INVALID_STATE", f"Tindakan berstatus {a.state}")
@@ -449,7 +458,7 @@ def cancel_action(aid: str, body: ReasonIn, db: Session = Depends(get_db), user:
 
 # ---------- penutupan (titik kendali #5) ----------
 @router.post("/findings/{fid}/submit-closure", response_model=ResponseWrapper[dict])
-def submit_closure(fid: str, db: Session = Depends(get_db), user: AppUser = Depends(OFFICER_OR_OWNER)):
+def submit_closure(fid: str, db: Session = Depends(get_db), user: AppUser = Depends(CLOSURE_PROPOSE)):
     f = get_or_404(db, Finding, fid)
     _check_scope(db, f, user)
     if f.state not in (V.FindingState.IN_REMEDIATION.value, V.FindingState.ACTION_PLANNED.value):
@@ -467,7 +476,7 @@ def submit_closure(fid: str, db: Session = Depends(get_db), user: AppUser = Depe
 
 
 @router.post("/findings/{fid}/close", response_model=ResponseWrapper[dict])
-def decide_closure(fid: str, body: ClosureDecisionIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def decide_closure(fid: str, body: ClosureDecisionIn, db: Session = Depends(get_db), user: AppUser = Depends(CLOSURE_DECIDE)):
     """FR-EVR-006: validator ≠ pemilik tindakan mana pun, ≠ pemunculan temuan, ≠ pengaju penutupan."""
     f = get_or_404(db, Finding, fid)
     if f.state != V.FindingState.PENDING_CLOSURE_VALIDATION.value:
@@ -504,7 +513,7 @@ def decide_closure(fid: str, body: ClosureDecisionIn, db: Session = Depends(get_
 
 
 @router.post("/findings/{fid}/accept-risk", response_model=ResponseWrapper[dict])
-def accept_risk(fid: str, body: RiskAcceptIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def accept_risk(fid: str, body: RiskAcceptIn, db: Session = Depends(get_db), user: AppUser = Depends(FINDING_APPROVE)):
     f = get_or_404(db, Finding, fid)
     if f.state not in (V.FindingState.OPEN.value, V.FindingState.ACTION_PLANNED.value):
         raise AppError(409, "INVALID_STATE", f"Risiko hanya dapat diterima dari OPEN/ACTION_PLANNED, bukan {f.state}")
@@ -524,7 +533,7 @@ def accept_risk(fid: str, body: RiskAcceptIn, db: Session = Depends(get_db), use
 
 
 @router.post("/findings/{fid}/reopen", response_model=ResponseWrapper[dict])
-def reopen(fid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(MANAGER)):
+def reopen(fid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(FINDING_REOPEN)):
     f = get_or_404(db, Finding, fid)
     if f.state != V.FindingState.CLOSED.value:
         raise AppError(409, "INVALID_STATE", f"Hanya temuan CLOSED yang dapat dibuka kembali, bukan {f.state}")

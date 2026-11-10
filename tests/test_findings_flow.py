@@ -70,7 +70,9 @@ def test_remediation_to_closure_full_path(client, H):
     assert dl.status_code == 200 and dl.content == b"log pengingat terkirim"
 
     assert client.post(f"{P}/compliance/actions/{aid}/complete", headers=H["owner"], json={"note": "Selesai"}).status_code == 200
-    assert client.post(f"{P}/compliance/findings/{fid}/submit-closure", headers=H["owner"]).json()["data"]["state"] == "PENDING_CLOSURE_VALIDATION"
+    # matriks RBAC "Penutupan Finding": Pemilik Kontrol tidak punya akses; hanya Pejabat yang MENGUSULKAN penutupan (C/propose)
+    assert client.post(f"{P}/compliance/findings/{fid}/submit-closure", headers=H["owner"]).status_code == 403
+    assert client.post(f"{P}/compliance/findings/{fid}/submit-closure", headers=H["officer"]).json()["data"]["state"] == "PENDING_CLOSURE_VALIDATION"
 
     # titik kendali #5
     assert client.post(f"{P}/compliance/findings/{fid}/close", headers=H["officer"],

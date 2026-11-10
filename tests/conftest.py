@@ -90,6 +90,8 @@ def login(client, username):
 
 
 P = "/api/v1"
+# URL asal wajib untuk setiap unggahan (FR-RKM-002); berada di bawah situs sumber OJK
+ORIGIN = "https://www.ojk.go.id/id/regulasi/uji"
 
 
 def uid(client, h, name):
@@ -106,8 +108,11 @@ def make_active_obligation(client, text_body=None):
     doc = client.post(f"{P}/corpus/documents", headers=analyst, json={
         "canonical_number": number, "title_id": "Manajemen Risiko Bank Umum"}).json()["data"]["id"]
     body = text_body or "Pasal 1\nBank wajib menyampaikan laporan bulanan kepada regulator paling lambat 10 (sepuluh) hari kerja."
+    # baris pembuka unik (di luar pasal) → berkas tidak identik dengan unggahan lain (cek duplikat FR-RKM-002)
+    body = f"Dokumen uji {_uuid.uuid4().hex}\n{body}"
     vid = client.post(f"{P}/corpus/documents/{doc}/versions", headers=analyst,
-                      files={"file": ("t.txt", body.encode())}, data={"effective_date": str(_date.today())}).json()["data"]["version_id"]
+                      files={"file": ("t.txt", body.encode())},
+                      data={"effective_date": str(_date.today()), "origin_url": ORIGIN}).json()["data"]["version_id"]
     client.post(f"{P}/corpus/versions/{vid}/publish", headers=analyst)
     pv = client.get(f"{P}/corpus/versions/{vid}/provisions", headers=analyst).json()["data"][0]["provision_version_id"]
     approve_applicability(client, vid, [pv])

@@ -86,6 +86,22 @@ def _write(path: Path, data: dict) -> None:
         path.write_text(text, encoding="utf-8")
 
 
+def _meta_revision(db, doc: Document) -> str:
+    """Waktu perubahan terakhir data dokumen (nomor, judul, jenis, penerbit) dari jejak audit."""
+    best = _ts(doc.created_at) if doc.created_at else _ts(EPOCH)
+    for action, at, after in db.execute(select(AuditEvent.action, AuditEvent.occurred_at, AuditEvent.after_state)
+                                        .where(AuditEvent.object_id == doc.id,
+                                               AuditEvent.action.in_(("DOCUMENT_UPDATED", SYNC_ACTION)))):
+        if action == SYNC_ACTION:
+            t = (after or {}).get("meta_updated_at")
+            if not t:
+                continue
+            best = max(best, _ts(t))
+        else:
+            best = max(best, _ts(at))
+    return _iso(best)
+
+
 def _revision(db, dv: DocumentVersion) -> str:
     """Waktu perubahan terakhir sebuah versi, diambil dari jejak audit versi & pasal-pasalnya.
     Peristiwa sinkronisasi memakai waktu ASAL perubahan (dari laptop lain), bukan waktu impornya."""
@@ -146,15 +162,22 @@ def export_document(db, doc: Document) -> int:
             labels[(lb.dimension, lb.value)] = {"dimension": lb.dimension, "value": lb.value, "state": lb.state,
                                                 "source": lb.source, "reason": lb.reason}
     src = db.get(RegulatorySource, doc.source_id)
+    if old and old.get("meta_updated_at") and _ts(old["meta_updated_at"]) > _ts(_meta_revision(db, doc)):
+        # data dokumen di folder lebih baru (diubah di laptop lain, belum diimpor di sini) → pertahankan
+        doc_fields = {k: old[k] for k in ("instrument_type", "issuer", "title_id", "meta_updated_at")}
+    else:
+        doc_fields = {}
     _write(meta_path, {
         "format": FORMAT, "id": old.get("id", str(doc.id)),
         "canonical_number": doc.canonical_number, "instrument_type": doc.instrument_type, "issuer": doc.issuer,
         "title_id": doc.title_id, "created_at": old.get("created_at", _iso(doc.created_at)),
+        "meta_updated_at": _meta_revision(db, doc),  # perubahan judul/jenis/penerbit terbaru menang di laptop lain
         "deleted_at": None,  # dokumen ada di laptop ini → bukan penanda hapus
         "source": {"name": src.name, "category": src.category, "issuer_name": src.issuer_name,
                    "base_url": src.base_url, "permitted_use_statement": src.permitted_use_statement,
                    "status": src.status},
         "labels": sorted(labels.values(), key=lambda x: (x["dimension"], x["value"])),
+        **doc_fields,
     })
 
     versions = db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == doc.id)).all()
@@ -184,10 +207,14 @@ def export_document(db, doc: Document) -> int:
 
 
 def export_deleted_documents(db) -> None:
-    """Dokumen yang dihapus di laptop ini → tandai dokumen.json-nya dengan deleted_at."""
-    for at, before in db.execute(select(AuditEvent.occurred_at, AuditEvent.before_state).where(
-            AuditEvent.action == "DOCUMENT_DELETED")):
+    """Dokumen yang dihapus — atau nomornya diganti — di laptop ini → tandai folder nomor LAMA dengan deleted_at,
+    agar laptop lain ikut menghapus dokumen bernomor lama (folder bernomor baru dibuat oleh export_document)."""
+    for action, at, before, after in db.execute(
+            select(AuditEvent.action, AuditEvent.occurred_at, AuditEvent.before_state, AuditEvent.after_state)
+            .where(AuditEvent.action.in_(("DOCUMENT_DELETED", "DOCUMENT_UPDATED")))):
         number = (before or {}).get("canonical_number")
+        if action == "DOCUMENT_UPDATED" and number == (after or {}).get("canonical_number"):
+            continue  # hanya judul/jenis yang berubah, bukan nomornya
         if not number or TEST_DOC_RE.match(number):
             continue
         if db.scalar(select(Document.id).where(Document.canonical_number == number)):
@@ -221,8 +248,7 @@ def auto_export(db, doc_id=None) -> None:
         doc = db.get(Document, uuid.UUID(str(doc_id))) if doc_id else None
         if doc is not None and not TEST_DOC_RE.match(doc.canonical_number):
             export_document(db, doc)
-        elif doc is None:
-            export_deleted_documents(db)
+        export_deleted_documents(db)  # penanda hapus / ganti nomor (murah: hanya membaca jejak audit)
     except Exception:  # noqa: BLE001 — sinkronisasi gagal tidak boleh menggagalkan unggahan/publikasi
         log.exception("Ekspor otomatis korpus gagal (data di database tetap tersimpan)")
 
@@ -242,9 +268,12 @@ def _free_id(db, model, wanted):
 def _get_source(db, s: dict) -> RegulatorySource:
     src = db.scalar(select(RegulatorySource).where(RegulatorySource.name == s["name"]))
     if not src:
+        from app.corpus.services import DEFAULT_PERMITTED_USE
+        # sumber ACTIVE wajib punya pernyataan penggunaan (aturan DB migrasi 006)
         src = RegulatorySource(name=s["name"], category=s["category"], issuer_name=s["issuer_name"],
-                               base_url=s["base_url"], permitted_use_statement=s.get("permitted_use_statement"),
-                               status=s.get("status") or "ACTIVE")
+                               base_url=s["base_url"], url_allow_list=[s["base_url"]],
+                               permitted_use_statement=s.get("permitted_use_statement") or DEFAULT_PERMITTED_USE,
+                               status="ACTIVE")
         db.add(src)
         db.flush()
     return src
@@ -395,8 +424,15 @@ def _import_document(db, folder: Path, stats: dict) -> None:
                        created_at=_ts(meta["created_at"]))
         db.add(doc)
         db.flush()
-        audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name, "created": True})
+        audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name, "created": True,
+                                                                "meta_updated_at": meta.get("meta_updated_at")})
         stats["dokumen_baru"] += 1
+    elif meta.get("meta_updated_at") and _ts(meta["meta_updated_at"]) > _ts(_meta_revision(db, doc)):
+        # judul / jenis / penerbit diubah di laptop lain lebih baru → terapkan di sini
+        doc.title_id, doc.instrument_type, doc.issuer = meta["title_id"], meta["instrument_type"], meta["issuer"]
+        audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name,
+                                                                "meta_updated_at": meta["meta_updated_at"]})
+        stats["dokumen_diperbarui"] += 1
 
     have = {(lb.dimension, lb.value): lb for lb in db.scalars(
         select(TaxonomyLabel).where(TaxonomyLabel.document_id == doc.id))}
@@ -423,8 +459,8 @@ def _import_document(db, folder: Path, stats: dict) -> None:
 
 
 def import_all() -> dict:
-    stats = {"dokumen_baru": 0, "dokumen_dihapus": 0, "versi_baru": 0, "versi_diperbarui": 0, "versi_dihapus": 0,
-             "peringatan": []}
+    stats = {"dokumen_baru": 0, "dokumen_diperbarui": 0, "dokumen_dihapus": 0, "versi_baru": 0,
+             "versi_diperbarui": 0, "versi_dihapus": 0, "peringatan": []}
     if not ROOT.exists():
         return stats
     db = SessionLocal()
@@ -450,7 +486,8 @@ def main() -> None:
         print("Langkah berikutnya: GitHub Desktop → centang folder data/korpus → Commit → Push origin.")
     else:
         s = import_all()
-        print(f"IMPOR SELESAI: {s['dokumen_baru']} dokumen baru, {s['dokumen_dihapus']} dokumen dihapus, "
+        print(f"IMPOR SELESAI: {s['dokumen_baru']} dokumen baru, {s['dokumen_diperbarui']} dokumen diperbarui, "
+              f"{s['dokumen_dihapus']} dokumen dihapus, "
               f"{s['versi_baru']} versi baru, {s['versi_diperbarui']} versi diperbarui, "
               f"{s['versi_dihapus']} versi dihapus.")
         for w in s["peringatan"]:

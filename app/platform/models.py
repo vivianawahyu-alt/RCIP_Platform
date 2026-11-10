@@ -21,6 +21,9 @@ class AppUser(Base):
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False)
+    # D (soft) pada matriks "Administrasi pengguna dan peran": akun dinonaktifkan, tidak pernah dihapus fisik,
+    # supaya jejak audit & approval yang menunjuk user_id tetap utuh.
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(DateTime(timezone=True), default=_now)
 
 
@@ -80,6 +83,25 @@ class AiCallLog(Base):
     grounding_passed = Column(Boolean, nullable=False)
     confidence = Column(Numeric(3, 2))
     created_at = Column(DateTime(timezone=True), default=_now)
+    # FR-COP-004 (migrasi 006): siapa bertanya & status jawaban yang disajikan
+    user_id = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
+    presented_state = Column(String)
+
+
+class CopilotReview(Base):
+    """FR-COP-005: permintaan tinjauan manusia atas jawaban copilot berkeyakinan rendah."""
+    __tablename__ = "copilot_review"
+    __table_args__ = S
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    interaction_id = Column(UUID(as_uuid=True), ForeignKey("platform.ai_call_log.id"), nullable=False, unique=True)
+    state = Column(String, nullable=False, default="PENDING")  # PENDING | COMPLETED
+    requested_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"), nullable=False)
+    requested_at = Column(DateTime(timezone=True), default=_now)
+    request_note = Column(Text)
+    reviewer_id = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
+    verdict = Column(String)  # CONFIRMED | CORRECTED | REJECTED
+    corrected_text = Column(Text)
+    reviewed_at = Column(DateTime(timezone=True))
 
 
 class Config(Base):

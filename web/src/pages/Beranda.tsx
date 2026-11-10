@@ -1,11 +1,12 @@
 import { api } from "../api";
+import { canDo } from "../permissions";
 import type { Doc } from "../types";
 import type { Ctx } from "../ui";
 import { Empty, ImpactIcon, Sev, Status, fmtDate, fmtTime, useLoad } from "../ui";
 
 export function Beranda({ ctx }: { ctx: Ctx }) {
   const [m] = useLoad<any>(() => api("/compliance/dashboard"), [], ctx.notify);
-  const [docs] = useLoad<Doc[]>(() => api("/corpus/documents"), [], ctx.notify);
+  const [docs] = useLoad<Doc[]>(() => canDo(ctx.me.role, "document_version", "R") ? api("/corpus/documents") : Promise.resolve([]), [], ctx.notify);
   if (!m) return <div className="panel">Memuat postur kepatuhan…</div>;
   const total = m.active_obligations || 0;
   const full = m.with_effective_control, part = m.partial_coverage, none = m.gaps;
