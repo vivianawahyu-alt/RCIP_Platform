@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import type { Me, Role } from "./types";
+import { PasalText, ROLE_LABEL, canSeePage, fmtDate, homeRoute } from "./ui";
 import { api, hasToken, setToken } from "./api";
 import { canDo } from "./permissions";
-import type { Me } from "./types";
-import { PasalText, ROLE_LABEL, canSeePage, fmtDate } from "./ui";
 import type { Ctx } from "./ui";
 import { Beranda } from "./pages/Beranda";
+import { Postur } from "./pages/Eksekutif";
+import { KontrolSaya } from "./pages/KontrolSaya";
 import { Regulasi, Perubahan } from "./pages/Regulasi";
+import { Katalog } from "./pages/Katalog";
+import { Peraturan } from "./pages/Peraturan";
 import { Kewajiban } from "./pages/Kewajiban";
 import { Kontrol, Asesmen } from "./pages/Kontrol";
 import { Temuan } from "./pages/Temuan";
@@ -18,10 +22,13 @@ import { Keberlakuan } from "./pages/Keberlakuan";
 import { Admin } from "./pages/Admin";
 import { Sumber } from "./pages/Sumber";  // [A19] halaman registri sumber regulasi
 
-type Item = { route: string; label: string; desc: string };
+
+type Item = { route: string; label: string; desc: string; only?: Role[] };
 const MENU: { label: string; items: Item[] }[] = [
-  { label: "Pusat Regulasi", items: [
+  { label: "Beranda", items: [{ route: "beranda", label: "Beranda", desc: "Postur kepatuhan", only: ["EXECUTIVE"] }] },
+  { label: "Kontrol saya", items: [{ route: "kontrol-saya", label: "Kontrol saya", desc: "Bukti & temuan milik Anda", only: ["BUSINESS_CONTROL_OWNER"]},
     { route: "regulasi", label: "Korpus & pasal", desc: "Dokumen, versi imutabel, dan teks pasal" },
+    { route: "katalog", label: "Katalog peraturan", desc: "Telusuri seluruh peraturan" },
     { route: "sumber", label: "Sumber regulasi", desc: "Registri sumber & persetujuan penggunaan" },  // [A19]
     { route: "perubahan", label: "Perubahan regulasi", desc: "Bandingkan versi, deteksi perubahan material" },
     { route: "copilot", label: "Tanya regulasi", desc: "Jawaban bersitasi + antrean tinjauan" }] },
@@ -73,10 +80,10 @@ export default function App() {
       <button onClick={logout}>Keluar</button>
     </div></div>
     <div className="mainbar"><div className="wrap">
-      <button className="wordmark" onClick={() => go("beranda")} aria-label="Beranda RCIP"><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
+      <button className="wordmark" onClick={() => go(homeRoute(me.role))} aria-label="Beranda RCIP"><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
       <nav className="menu" aria-label="Menu utama">
-        {MENU.map(g => ({ ...g, items: g.items.filter(i => canSeePage(me.role, i.route)) })).filter(g => g.items.length > 0).map(g => {
-          const active = g.items.some(i => i.route === page);
+        {MENU.map(g => ({ ...g, items: g.items.filter(i => canSeePage(me.role, i.route) && (!i.only || i.only.includes(me.role))) })).filter(g => g.items.length > 0).map(g => {
+                    const active = g.items.some(i => i.route === (page === "peraturan" ? "katalog" : page));  // halaman detail ikut menandai Katalog
           if (g.items.length === 1) return <div className="menu-group" key={g.label}><button className={active ? "active" : ""} onClick={() => go(g.items[0].route)}>{g.label}</button></div>;
           return <div key={g.label} className={`menu-group ${open === g.label ? "open" : ""}`} onClick={e => e.stopPropagation()}>
             <button className={active ? "active" : ""} aria-expanded={open === g.label} onClick={() => setOpen(open === g.label ? null : g.label)}>{g.label} ▾</button>
@@ -94,8 +101,11 @@ export default function App() {
     </div></div>
     <main className="wrap">
       {msg && <div className={`notice ${msg.kind}`} role="status"><span>{msg.text}</span><button onClick={() => setMsg(null)}>Tutup</button></div>}
-      {!canSeePage(me.role, page) && (queueMicrotask(() => go("beranda")), null)}
-      {canSeePage(me.role, page) && page === "beranda" && <Beranda ctx={ctx} />}
+            {canSeePage(me.role, page) && page === "katalog" && <Katalog ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "peraturan" && <Peraturan ctx={ctx} id={param} />}
+      {!canSeePage(me.role, page) && (queueMicrotask(() => go(homeRoute(me.role))), null)}
+      {canSeePage(me.role, page) && page === "beranda" && (me.role === "EXECUTIVE" ? <Postur ctx={ctx} /> : <Beranda ctx={ctx} />)}
+{canSeePage(me.role, page) && page === "kontrol-saya" && <KontrolSaya ctx={ctx} />}
       {canSeePage(me.role, page) && page === "regulasi" && <Regulasi ctx={ctx} />}
       {canSeePage(me.role, page) && page === "perubahan" && <Perubahan ctx={ctx} />}
       {canSeePage(me.role, page) && page === "sumber" && <Sumber ctx={ctx} />}

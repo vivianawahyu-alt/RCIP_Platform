@@ -3,11 +3,15 @@ import { canDo } from "../permissions";
 import { ApiError, api, openFile } from "../api";
 import type { Doc, Source } from "../types";
 import type { Ctx } from "../ui";
-import { Empty, Flow, PageHead, PasalText, Status, can, fmtDate, useAction, useLoad } from "../ui";
+import  {INSTRUMENT_TYPES,Empty, Flow, PageHead, PasalText, Status, can, fmtDate, useAction, useLoad } from "../ui";
 
 // [A10] jenis instrumen yang bisa dipilih (SEOJK = Surat Edaran OJK)
-const INSTRUMENTS = ["UU", "PP", "POJK", "SEOJK", "PBI", "PADG"];
-// [A10] ukuran berkas yang mudah dibaca: 1532 → "1,5 KB"
+const INSTRUMENTS = INSTRUMENT_TYPES;
+// isian awal form "Daftarkan dokumen" (termasuk metadata katalog)
+const EMPTY_ND = { canonical_number: "", title_id: "", instrument_type: "POJK", source_id: "", year: "", enacted_date: "", promulgated_date: "", gazette_ref: "" };
+// isian form "Ubah data dokumen" dari dokumen yang dipilih
+const docForm = (d: Doc) => ({ canonical_number: d.canonical_number, title_id: d.title_id, instrument_type: d.instrument_type, issuer: d.issuer || "",
+  year: d.year ? String(d.year) : "", enacted_date: d.enacted_date || "", promulgated_date: d.promulgated_date || "", gazette_ref: d.gazette_ref || "" });
 const fmtSize = (n?: number | null) => n == null ? "" : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toLocaleString("id-ID", { maximumFractionDigits: 1 })} KB` : `${(n / 1048576).toLocaleString("id-ID", { maximumFractionDigits: 1 })} MB`;
 
 // [11a] low_confidence_text = true → teks pasal hasil OCR yang belum dikonfirmasi analis
@@ -33,7 +37,7 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
   const [docs, reload] = useLoad<Doc[]>(() => api("/corpus/documents"), [], ctx.notify);
   const [sel, setSel] = useState<string>("");
   const [provs, setProvs] = useState<Prov[]>([]);
-  const [nd, setNd] = useState({ canonical_number: "", title_id: "", instrument_type: "POJK", source_id: "" });
+    const [nd, setNd] = useState(EMPTY_ND);
   // [A11] registri sumber: hanya sumber ACTIVE yang boleh dipilih saat mendaftarkan dokumen
   const [sources] = useLoad<Source[]>(() => api("/corpus/sources"), [], ctx.notify);
   const activeSources = (sources || []).filter(x => x.status === "ACTIVE");
@@ -58,10 +62,10 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
   const statuses = Array.from(new Set((docs || []).map(d => d.status)));
 
   // [A13] unggah versi: URL asal WAJIB; berkas yang sama persis dengan versi lain ditolak (DUPLICATE_SUSPECTED)
-  const upload = (docId: string, file: File, origin: string) => run(async () => {
+    const upload = (docId: string, file: File, origin: string, eff: string) => run(async () => {
     const form = new FormData();
     form.append("file", file); form.append("origin_url", origin.trim());
-    form.append("effective_date", new Date().toISOString().slice(0, 10));
+        form.append("effective_date", eff);  // tanggal berlaku diisi analis (bukan tanggal hari ini)
     try {
       const r = await api(`/corpus/documents/${docId}/versions`, { form }); setSel(r.version_id);
       // [11c] PDF hasil pindaian: beri tahu halaman mana yang dibaca lewat OCR
@@ -93,6 +97,8 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
               {selVer.file_name && <> · {selVer.file_name} ({fmtSize(selVer.size_bytes)})</>}</div></div>
             <span className="row">{selVer.has_file && <button className="btn sm" onClick={() => openFile(`/corpus/versions/${selVer.id}/file`).catch(e => ctx.notify("error", e.message))}>Lihat berkas asli</button>}
               <Status s={selVer.state} /></span></header>
+                        {/* tanggal berlaku versi DRAF boleh diperbaiki; versi terbit imutabel (tarik lalu unggah ulang) */}
+          {draft && analyst && <VersionDate key={selVer.id} v={selVer} busy={busy} run={run} />}
           {/* [11d] kotak peringatan kuning: publikasi diblokir selama masih ada pasal OCR yang belum dikonfirmasi */}
           {draft && ocrPending > 0 && <div className="notice warn"><span>{ocrPending} pasal berasal dari OCR dan belum diperiksa. Bandingkan dengan PDF aslinya, lalu klik <b>Konfirmasi teks</b> atau <b>Koreksi teks</b> pada setiap pasal sebelum publikasi.</span></div>}
           {/* Pasal dikelompokkan per BAB; setiap BAB bisa dilipat/dibuka */}
@@ -117,7 +123,7 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
             {docs && <span className="small muted">{shown.length} dari {docs.length} dokumen</span>}
           </div>
           {shown.length ? <ul className="list">{shown.map(d => <li key={d.id}>
-            <div className="between"><div className="title">{d.canonical_number}</div><Status s={d.status} /></div><div className="sub">{d.issuer} · {d.title_id}</div>
+            <div className="between"><div className="title">{d.canonical_number}</div><span className="row" style={{ gap: 4 }}><button className="btn sm ghost" onClick={() => ctx.go(`peraturan/${d.id}`)}>Detail</button><Status s={d.status} /></span></div><div className="sub">{d.issuer} · {d.title_id}</div>
             {!!d.labels?.length && <div className="row" style={{ marginTop: 6, gap: 4 }}>{d.labels.map((l, i) => <span key={i} className={`badge ${l.state === "CONFIRMED" ? "teal" : ""}`} title={`${l.dimension} · ${l.state === "CONFIRMED" ? "terkonfirmasi" : "saran aturan"}`}>{l.value}</span>)}</div>}
             <div className="row" style={{ marginTop: 8 }}>{d.versions.map(v => <span key={v.id} className="row" style={{ gap: 4 }}>
               {/* Tombol pilih versi; versi yang ditarik diberi keterangan "(ditarik)" */}
@@ -127,7 +133,7 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
             {/* Tombol Hapus/Tarik versi & Hapus dokumen (khusus Analis); kosongkan pilihan bila versi yang dibuka ikut terhapus */}
             {analyst && <CorpusActions role={ctx.me.role} doc={d} busy={busy} run={run} onRemoved={id => { if (d.versions.some(v => v.id === sel) && (id === d.id || id === sel)) setSel(""); }} />}
             {/* [A13] formulir unggah: URL asal wajib diisi sebelum berkas dikirim */}
-            {analyst && <UploadForm busy={busy} onUpload={(f, url) => upload(d.id, f, url)} />}
+            {analyst && <UploadForm busy={busy} onUpload={(f, url, eff) => upload(d.id, f, url, eff)} />}
           </li>)}</ul> : <Empty>{docs?.length ? "Tidak ada dokumen yang cocok dengan filter." : "Belum ada dokumen."}</Empty>}
         </section>
         {/* [A15] ubah judul/nomor/jenis/penerbit dokumen terpilih (matriks: Perubahan status dokumen U = Analis) */}
@@ -139,6 +145,12 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
             <label className="field">Nomor regulasi<input value={nd.canonical_number} onChange={e => setNd({ ...nd, canonical_number: e.target.value })} placeholder="POJK 4/POJK.05/2021" /></label>
             <label className="field">Judul<input value={nd.title_id} onChange={e => setNd({ ...nd, title_id: e.target.value })} placeholder="Penerapan Manajemen Risiko bagi Bank Umum" /></label>
             <label className="field">Jenis instrumen<select value={nd.instrument_type} onChange={e => setNd({ ...nd, instrument_type: e.target.value })}>{INSTRUMENTS.map(x => <option key={x}>{x}</option>)}</select></label>
+                        <div className="form-2">
+              <label className="field">Tahun (kosong = dari nomor)<input type="number" value={nd.year} onChange={e => setNd({ ...nd, year: e.target.value })} placeholder="2022" /></label>
+              <label className="field">Rujukan lembaran<input value={nd.gazette_ref} onChange={e => setNd({ ...nd, gazette_ref: e.target.value })} placeholder="LN 2022/No. 196" /></label>
+              <label className="field">Tanggal penetapan<input type="date" value={nd.enacted_date} onChange={e => setNd({ ...nd, enacted_date: e.target.value })} /></label>
+              <label className="field">Tanggal pengundangan<input type="date" value={nd.promulgated_date} onChange={e => setNd({ ...nd, promulgated_date: e.target.value })} /></label>
+            </div>
             {/* [A11] sumber wajib dipilih dari registri; sumber yang belum disetujui Manajer tidak muncul */}
             <label className="field">Sumber regulasi<select value={nd.source_id} onChange={e => setNd({ ...nd, source_id: e.target.value })}>
               <option value="">Pilih sumber aktif</option>{activeSources.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
@@ -146,8 +158,10 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
             <button className="btn primary" disabled={busy || !nd.canonical_number || !nd.title_id || !nd.source_id} onClick={() => run(async () => {
               // issuer diisi dari penerbit sumber agar konsisten
               const src = activeSources.find(x => x.id === nd.source_id);
-              await api("/corpus/documents", { body: { ...nd, issuer: src?.issuer_name } });
-              setNd({ canonical_number: "", title_id: "", instrument_type: "POJK", source_id: "" });
+                            await api("/corpus/documents", { body: { canonical_number: nd.canonical_number, title_id: nd.title_id, instrument_type: nd.instrument_type,
+                source_id: nd.source_id, issuer: src?.issuer_name, year: nd.year ? Number(nd.year) : null, enacted_date: nd.enacted_date || null,
+                promulgated_date: nd.promulgated_date || null, gazette_ref: nd.gazette_ref || null } });
+              setNd(EMPTY_ND);
             }, "Dokumen terdaftar. Unggah versi pertamanya.")}>Daftarkan dokumen</button>
           </div>
         </section>}
@@ -201,26 +215,40 @@ function ProvItem({ p, draft, analyst, canExtract, busy, run, extract, onSaved }
 }
 
 /** [A13] KOMPONEN BARU. Unggah versi: isi URL asal (wajib) → pilih berkas → klik Unggah. */
-function UploadForm({ busy, onUpload }: { busy: boolean; onUpload: (f: File, url: string) => Promise<boolean> }) {
-  const [url, setUrl] = useState(""), [file, setFile] = useState<File | null>(null), [k, setK] = useState(0);
+function UploadForm({ busy, onUpload }: { busy: boolean; onUpload: (f: File, url: string, eff: string) => Promise<boolean> }) {
+  const [url, setUrl] = useState(""), [file, setFile] = useState<File | null>(null), [k, setK] = useState(0), [eff, setEff] = useState("");
   const okUrl = /^https?:\/\/\S+\.\S+/.test(url.trim());  // pemeriksaan ringan; server tetap memeriksa
   return <div className="form" style={{ marginTop: 10 }}>
     <label className="field">URL asal dokumen (wajib)<input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.ojk.go.id/id/regulasi/..." /></label>
+        <label className="field">Tanggal berlaku versi ini (wajib)<input type="date" value={eff} onChange={e => setEff(e.target.value)} /></label>
     <label className="field">Berkas versi baru (.pdf/.txt)<input key={k} type="file" accept=".pdf,.txt" onChange={e => setFile(e.target.files?.[0] || null)} /></label>
-    <div><button className="btn sm primary" disabled={busy || !file || !okUrl} onClick={async () => {
-      if (file && await onUpload(file, url)) { setFile(null); setUrl(""); setK(x => x + 1); }  // k berubah → input berkas dikosongkan
+           <div><button className="btn sm primary" disabled={busy || !file || !okUrl || !eff} onClick={async () => {
+      if (file && await onUpload(file, url, eff)) { setFile(null); setUrl(""); setEff(""); setK(x => x + 1); }  // k berubah → input berkas dikosongkan  // k berubah → input berkas dikosongkan  // k berubah → input berkas dikosongkan
     }}>Unggah versi</button>{url && !okUrl && <span className="small" style={{ color: "var(--red)", marginLeft: 8 }}>URL harus diawali http:// atau https://</span>}</div>
   </div>;
 }
-
+/** Perbaiki tanggal berlaku versi DRAF (mis. salah isi saat unggah). Versi terbit tidak bisa diubah. */
+function VersionDate({ v, busy, run }: { v: Doc["versions"][number]; busy: boolean; run: Run }) {
+  const [dt, setDt] = useState(v.effective_date);
+  return <div className="row" style={{ margin: "6px 0 10px" }}>
+    <label className="small muted">Tanggal berlaku versi {v.version_number}</label>
+    <input type="date" value={dt} onChange={e => setDt(e.target.value)} aria-label={`Tanggal berlaku versi ${v.version_number}`} />
+    <button className="btn sm" disabled={busy || !dt || dt === v.effective_date}
+      onClick={() => run(() => api(`/corpus/versions/${v.id}`, { method: "PATCH", body: { effective_date: dt } }), "Tanggal berlaku diperbarui.")}>Simpan tanggal</button>
+  </div>;
+}
 /** [A15] KOMPONEN BARU. Ubah data dokumen. Nomor regulasi dikunci bila dokumen pernah terbit
  *  (kewajiban & sitasi sudah memakai nomor itu); judul, jenis, dan penerbit tetap boleh diperbaiki. */
 function DocEdit({ doc, busy, run }: { doc: Doc; busy: boolean; run: Run }) {
-  const [f, setF] = useState({ canonical_number: doc.canonical_number, title_id: doc.title_id, instrument_type: doc.instrument_type, issuer: doc.issuer || "" });
+    const [f, setF] = useState(docForm(doc));
   const [open, setOpen] = useState(false);
   const frozen = doc.versions.some(v => v.state === "PUBLISHED" || v.state === "WITHDRAWN");
   // kirim hanya kolom yang berubah
   const changes = Object.fromEntries(Object.entries(f).filter(([k, v]) => v.trim() !== String((doc as any)[k] ?? "")).map(([k, v]) => [k, v.trim()]));
+    // tahun → angka; tahun/tanggal/lembaran yang dikosongkan → null (server menghapus nilainya)
+  const body = Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, k === "year" ? (v ? Number(v) : null)
+    : ["enacted_date", "promulgated_date", "gazette_ref"].includes(k) && !v ? null : v]));
+  
   return <section className="panel">
     <div className="between"><h2>Data dokumen</h2>{!open && <button className="btn sm ghost" onClick={() => setOpen(true)}>Ubah</button>}</div>
     {open && <div className="form">
@@ -230,11 +258,15 @@ function DocEdit({ doc, busy, run }: { doc: Doc; busy: boolean; run: Run }) {
       <div className="form-2">
         <label className="field">Jenis<select value={f.instrument_type} onChange={e => setF({ ...f, instrument_type: e.target.value })}>{INSTRUMENTS.map(x => <option key={x}>{x}</option>)}</select></label>
         <label className="field">Penerbit<input value={f.issuer} onChange={e => setF({ ...f, issuer: e.target.value })} /></label>
+                <label className="field">Tahun<input type="number" value={f.year} onChange={e => setF({ ...f, year: e.target.value })} /></label>
+        <label className="field">Rujukan lembaran<input value={f.gazette_ref} onChange={e => setF({ ...f, gazette_ref: e.target.value })} /></label>
+        <label className="field">Tanggal penetapan<input type="date" value={f.enacted_date} onChange={e => setF({ ...f, enacted_date: e.target.value })} /></label>
+        <label className="field">Tanggal pengundangan<input type="date" value={f.promulgated_date} onChange={e => setF({ ...f, promulgated_date: e.target.value })} /></label>
       </div>
       <div className="row">
         <button className="btn primary sm" disabled={busy || !Object.keys(changes).length || !f.canonical_number.trim() || !f.title_id.trim()}
-          onClick={async () => { if (await run(() => api(`/corpus/documents/${doc.id}`, { method: "PATCH", body: changes }), "Data dokumen diperbarui; tercatat di jejak audit.")) setOpen(false); }}>Simpan</button>
-        <button className="btn sm ghost" onClick={() => { setOpen(false); setF({ canonical_number: doc.canonical_number, title_id: doc.title_id, instrument_type: doc.instrument_type, issuer: doc.issuer || "" }); }}>Batal</button>
+          onClick={async () => { if (await run(() => api(`/corpus/documents/${doc.id}`, { method: "PATCH", body }), "Data dokumen diperbarui; tercatat di jejak audit.")) setOpen(false); }}>Simpan</button>
+        <button className="btn sm ghost" onClick={() => { setOpen(false); setF(docForm(doc)); }}>Batal</button>
       </div>
     </div>}
   </section>;

@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
-
+from app.compliance.executive import router as executive_router
+from app.compliance.owner import router as owner_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 
 from app.compliance.applicability import router as applicability_router
 from app.compliance.findings import router as findings_router
@@ -53,6 +55,8 @@ app.include_router(compliance_router)
 app.include_router(applicability_router)
 app.include_router(findings_router)
 app.include_router(reporting_router)
+app.include_router(executive_router)
+app.include_router(owner_router)
 app.include_router(copilot_router)
 
 

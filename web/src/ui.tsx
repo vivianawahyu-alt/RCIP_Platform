@@ -99,15 +99,31 @@ export const can = (role: Role, action: string): boolean => {
 const PAGE_READ: Record<string, [string, string][]> = {
   beranda: [["dashboard", "R"]], cari: [["corpus_search", "R"]], copilot: [["copilot_query", "X"]],
   regulasi: [["source_registry", "R"], ["document_version", "R"]], perubahan: [["change_review", "R"]],
+    katalog: [["corpus_search", "R"]], peraturan: [["corpus_search", "R"]],  // Katalog peraturan & halaman detail (semua peran)
   keberlakuan: [["applicability", "R"]], kewajiban: [["obligation", "R"]], kontrol: [["control_library", "R"]],
   asesmen: [["assessment_conclusion", "R"]], temuan: [["finding", "R"]], laporan: [["report_published", "R"]],
   audit: [["audit_trail", "R"]], admin: [["system_config", "R"], ["user_admin", "R"]],
   sumber: [["source_registry", "R"]],  // [A19] halaman Sumber regulasi
+  "kontrol-saya": [["control_library", "R"]],
 };
 /** [A18] log interaksi copilot: Promosi keluaran copilot (R) atau Jejak audit (R) — sama dengan server */
 export const canReadCopilotLog = (role: Role) => canDo(role, "copilot_promote", "R") || canDo(role, "audit_trail", "R");
-export const canSeePage = (role: Role, page: string): boolean =>
-  (PAGE_READ[page] || [["dashboard", "R"]]).some(([c, l]) => canDo(role, c, l));
+/** Halaman yang hanya untuk peran tertentu. */
+const ONLY_ROLE: Record<string, Role[]> = { "kontrol-saya": ["BUSINESS_CONTROL_OWNER"] };
+/** Peran dengan layar khusus (sesuai mockup): hanya rute ini yang bisa dibuka. Hanya penataan UI; server tetap menegakkan RBAC. */
+const ROLE_ROUTES: Partial<Record<Role, string[]>> = {
+  EXECUTIVE: ["beranda", "laporan", "cari", "peraturan"],
+  BUSINESS_CONTROL_OWNER: ["kontrol-saya", "temuan", "cari", "peraturan"],
+};
+/** Halaman awal setelah login. */
+export const homeRoute = (role: Role): string => (role === "BUSINESS_CONTROL_OWNER" ? "kontrol-saya" : "beranda");
+
+export const canSeePage = (role: Role, page: string): boolean => {
+  if (ONLY_ROLE[page] && !ONLY_ROLE[page].includes(role)) return false;
+  const allowed = ROLE_ROUTES[role];
+  if (allowed && !allowed.includes(page)) return false;
+  return (PAGE_READ[page] || [["dashboard", "R"]]).some(([c, l]) => canDo(role, c, l));
+};
 
 export function ImpactIcon({ level }: { level: "high" | "medium" | "low" }) {
   const c = level === "high" ? "#b42318" : level === "medium" ? "#b54708" : "#667085";
@@ -167,4 +183,13 @@ export function PasalText({ text, className = "" }: { text: string; className?: 
     <div key={i} className={l.mark ? "pasal-item" : "pasal-para"} style={{ marginLeft: `${l.depth * 1.6}em` }}>
       {l.mark && <span className="pasal-mark">{l.mark}</span>}<span>{l.text}</span>
     </div>)}</div>;
+}
+/** Jenis instrumen yang bisa dipilih di form dokumen (SEOJK = Surat Edaran OJK, SEBI = Surat Edaran BI). */
+export const INSTRUMENT_TYPES = ["UU", "PERPPU", "PP", "PERPRES", "KEPPRES", "PMK", "PERMEN", "POJK", "SEOJK", "PADK", "PDK",
+  "PBI", "PADG", "SEBI", "PPATK", "PERDA", "PUTUSAN", "OTHER"];
+
+/** Cuplikan hasil pencarian: bagian yang cocok dibungkus [[...]] oleh server → ditandai dengan <mark>. */
+export function Highlight({ text }: { text: string }) {
+  return <>{text.split(/(\[\[[\s\S]*?\]\])/g).map((p, i) =>
+    p.startsWith("[[") && p.endsWith("]]") ? <mark key={i}>{p.slice(2, -2)}</mark> : <span key={i}>{p}</span>)}</>;
 }
