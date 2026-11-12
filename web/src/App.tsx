@@ -28,6 +28,7 @@ const MENU: { label: string; items: Item[] }[] = [
   { label: "Beranda", items: [{ route: "beranda", label: "Beranda", desc: "Postur kepatuhan", only: ["EXECUTIVE"] }] },
   { label: "Kontrol saya", items: [{ route: "kontrol-saya", label: "Kontrol saya", desc: "Bukti & temuan milik Anda", only: ["BUSINESS_CONTROL_OWNER"]},
     { route: "regulasi", label: "Korpus & pasal", desc: "Dokumen, versi imutabel, dan teks pasal" },
+    { route: "katalog", label: "Katalog peraturan", desc: "Telusuri seluruh peraturan" },
     { route: "sumber", label: "Sumber regulasi", desc: "Registri sumber & persetujuan penggunaan" },  // [A19]
     { route: "perubahan", label: "Perubahan regulasi", desc: "Bandingkan versi, deteksi perubahan material" },
     { route: "copilot", label: "Tanya regulasi", desc: "Jawaban bersitasi + antrean tinjauan" }] },
