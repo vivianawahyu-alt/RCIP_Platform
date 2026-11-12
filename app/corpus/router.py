@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from app.corpus import catalog, services
 from typing import Optional
 from urllib.parse import quote
+import hashlib
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import Response
