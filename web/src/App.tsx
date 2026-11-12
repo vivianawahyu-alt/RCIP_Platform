@@ -7,6 +7,8 @@ import { PasalText, ROLE_LABEL, canSeePage, fmtDate } from "./ui";
 import type { Ctx } from "./ui";
 import { Beranda } from "./pages/Beranda";
 import { Regulasi, Perubahan } from "./pages/Regulasi";
+import { Katalog } from "./pages/Katalog";
+import { Peraturan } from "./pages/Peraturan";
 import { Kewajiban } from "./pages/Kewajiban";
 import { Kontrol, Asesmen } from "./pages/Kontrol";
 import { Temuan } from "./pages/Temuan";
@@ -21,6 +23,7 @@ import { Sumber } from "./pages/Sumber";  // [A19] halaman registri sumber regul
 type Item = { route: string; label: string; desc: string };
 const MENU: { label: string; items: Item[] }[] = [
   { label: "Pusat Regulasi", items: [
+        { route: "katalog", label: "Katalog peraturan", desc: "Cari & saring peraturan, lihat versi dan relasinya" },
     { route: "regulasi", label: "Korpus & pasal", desc: "Dokumen, versi imutabel, dan teks pasal" },
     { route: "sumber", label: "Sumber regulasi", desc: "Registri sumber & persetujuan penggunaan" },  // [A19]
     { route: "perubahan", label: "Perubahan regulasi", desc: "Bandingkan versi, deteksi perubahan material" },
@@ -76,7 +79,7 @@ export default function App() {
       <button className="wordmark" onClick={() => go("beranda")} aria-label="Beranda RCIP"><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
       <nav className="menu" aria-label="Menu utama">
         {MENU.map(g => ({ ...g, items: g.items.filter(i => canSeePage(me.role, i.route)) })).filter(g => g.items.length > 0).map(g => {
-          const active = g.items.some(i => i.route === page);
+                    const active = g.items.some(i => i.route === (page === "peraturan" ? "katalog" : page));  // halaman detail ikut menandai Katalog
           if (g.items.length === 1) return <div className="menu-group" key={g.label}><button className={active ? "active" : ""} onClick={() => go(g.items[0].route)}>{g.label}</button></div>;
           return <div key={g.label} className={`menu-group ${open === g.label ? "open" : ""}`} onClick={e => e.stopPropagation()}>
             <button className={active ? "active" : ""} aria-expanded={open === g.label} onClick={() => setOpen(open === g.label ? null : g.label)}>{g.label} ▾</button>
@@ -94,6 +97,8 @@ export default function App() {
     </div></div>
     <main className="wrap">
       {msg && <div className={`notice ${msg.kind}`} role="status"><span>{msg.text}</span><button onClick={() => setMsg(null)}>Tutup</button></div>}
+            {canSeePage(me.role, page) && page === "katalog" && <Katalog ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "peraturan" && <Peraturan ctx={ctx} id={param} />}
       {!canSeePage(me.role, page) && (queueMicrotask(() => go("beranda")), null)}
       {canSeePage(me.role, page) && page === "beranda" && <Beranda ctx={ctx} />}
       {canSeePage(me.role, page) && page === "regulasi" && <Regulasi ctx={ctx} />}

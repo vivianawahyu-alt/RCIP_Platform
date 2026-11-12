@@ -1,5 +1,5 @@
-import hashlib  # sidik jari berkas untuk pemeriksaan duplikat
-from datetime import date
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from app.corpus import catalog, services
 from typing import Optional
 from urllib.parse import quote
 
@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 import uuid  # untuk object_id audit dokumen/versi yang dihapus
 
+from datetime import date
 from sqlalchemy import func, select  # func.count() untuk menghitung rujukan
 from sqlalchemy.exc import DBAPIError  # menangkap penolakan foreign key / trigger DB
 from sqlalchemy.orm import Session
@@ -40,14 +41,41 @@ class DocumentCreate(BaseModel):
     source_id: Optional[str] = None  # sumber terdaftar (menu Sumber regulasi); wajib ACTIVE
     source_category: str = "OJK"     # kompatibilitas lama: dipakai bila source_id kosong
     base_url: str = "https://www.ojk.go.id"
-
+    # metadata katalog (opsional)
+    year: Optional[int] = None               # bila kosong, diambil dari akhir nomor regulasi
+    enacted_date: Optional[date] = None      # tanggal penetapan
+    promulgated_date: Optional[date] = None  # tanggal pengundangan
+    gazette_ref: Optional[str] = None        # rujukan lembaran/berita negara
 
 class DocumentUpdate(BaseModel):
-    """Ubah data dokumen. Nomor regulasi hanya boleh diubah selama belum ada versi yang pernah terbit."""
+    """Ubah data dokumen. Nomor regulasi hanya boleh diubah selama belum ada versi yang pernah terbit.
+    Field katalog (tahun, tanggal, lembaran) boleh dikosongkan dengan mengirim null."""
     canonical_number: Optional[str] = None
     title_id: Optional[str] = None
     instrument_type: Optional[str] = None
     issuer: Optional[str] = None
+    year: Optional[int] = None
+    enacted_date: Optional[date] = None
+    promulgated_date: Optional[date] = None
+    gazette_ref: Optional[str] = None
+
+
+class VersionUpdate(BaseModel):
+    effective_date: date
+
+
+def _check_year(year: Optional[int]) -> None:
+    if year is not None and not 1945 <= year <= 2100:
+        raise AppError(422, "BAD_YEAR", "Tahun harus antara 1945 dan 2100", {"field": "year"})
+
+
+def _doc_snapshot(doc: Document) -> dict:
+    """Isi data dokumen yang bisa diubah, aman untuk jejak audit (tanggal → teks)."""
+    return {"canonical_number": doc.canonical_number, "title_id": doc.title_id, "instrument_type": doc.instrument_type,
+            "issuer": doc.issuer, "year": doc.year,
+            "enacted_date": str(doc.enacted_date) if doc.enacted_date else None,
+            "promulgated_date": str(doc.promulgated_date) if doc.promulgated_date else None,
+            "gazette_ref": doc.gazette_ref}
 
 
 class ProvisionCorrection(BaseModel):
@@ -86,17 +114,22 @@ def resolve(payload: CitationResolveRequest, db: Session = Depends(get_db), _: A
 @router.post("/api/v1/corpus/documents", response_model=ResponseWrapper[dict])
 def create_document(body: DocumentCreate, db: Session = Depends(get_db),
                     user: AppUser = Depends(require("source_registry", "C"))):  # Registri Regulatory Source: C = RA, Admin
-    if not body.canonical_number.strip() or not body.title_id.strip():
+    number, title = catalog.normalise_number(body.canonical_number), catalog.normalise_title(body.title_id)
+    if not number or not title:
         raise AppError(422, "VALIDATION_ERROR", "Nomor regulasi dan judul wajib diisi", {"field": "canonical_number"})
-    if db.scalar(select(Document).where(Document.canonical_number == body.canonical_number.strip())):
+    _check_year(body.year)
+    # duplikat dicek pada bentuk yang sudah dirapikan dan tanpa beda huruf besar/kecil ("1 /POJK" = "1/pojk")
+    if any(catalog.normalise_number(n).lower() == number.lower() for n in db.scalars(select(Document.canonical_number))):
         raise AppError(409, "DUPLICATE", "Nomor regulasi sudah terdaftar")
     if body.source_id:  # FR-RKM-001: dokumen terikat ke sumber terdaftar yang ACTIVE
         src = get_source(db, body.source_id)
     else:  # kompatibilitas lama (seed, tes): sumber dicari/dibuat dari kategori
         src = services.get_or_create_source(db, body.source_category, body.source_category, body.issuer, body.base_url)
     require_active(src)
-    doc = Document(source_id=src.id, canonical_number=body.canonical_number.strip(), instrument_type=body.instrument_type,
-                   issuer=body.issuer, title_id=body.title_id.strip())
+    doc = Document(source_id=src.id, canonical_number=number, instrument_type=body.instrument_type,
+                   issuer=body.issuer, title_id=title, year=body.year or catalog.extract_year(number),
+                   enacted_date=body.enacted_date, promulgated_date=body.promulgated_date,
+                   gazette_ref=(body.gazette_ref or "").strip() or None)
     db.add(doc)
     db.flush()
     from app.corpus.review import suggest_labels
@@ -125,6 +158,9 @@ def list_documents(db: Session = Depends(get_db),
         out.append({"id": str(d.id), "canonical_number": d.canonical_number, "title_id": d.title_id,
                     "status": d.status, "instrument_type": d.instrument_type, "issuer": d.issuer, "labels": labels,
                     "created_at": d.created_at.isoformat() if d.created_at else None,
+                    "year": d.year, "enacted_date": str(d.enacted_date) if d.enacted_date else None,
+                    "promulgated_date": str(d.promulgated_date) if d.promulgated_date else None,
+                    "gazette_ref": d.gazette_ref,
                     "source": {"id": str(src.id), "name": src.name, "status": src.status} if src else None,
                     "versions": [{"id": str(v.id), "version_number": v.version_number, "state": v.state,
                                   "effective_date": str(v.effective_date),
@@ -299,11 +335,25 @@ def update_document(doc_id: str, body: DocumentUpdate, db: Session = Depends(get
     """Perbaiki judul/jenis/penerbit kapan saja; nomor regulasi hanya selama belum pernah terbit
     (versi terbit sudah disitasi kewajiban & laporan dengan nomor itu)."""
     doc = _get(db, Document, doc_id)
-    before = {"canonical_number": doc.canonical_number, "title_id": doc.title_id,
-              "instrument_type": doc.instrument_type, "issuer": doc.issuer}
-    changes = {k: v.strip() for k, v in body.model_dump(exclude_none=True).items()}
+    before = _doc_snapshot(doc)
+    core = body.model_dump(exclude_none=True, include={"canonical_number", "title_id", "instrument_type", "issuer"})
+    changes: dict = {k: v.strip() for k, v in core.items()}
     if any(not v for v in changes.values()):
         raise AppError(422, "VALIDATION_ERROR", "Isian tidak boleh kosong", {"fields": [k for k, v in changes.items() if not v]})
+    if "title_id" in changes:
+        changes["title_id"] = catalog.normalise_title(changes["title_id"])
+    if "canonical_number" in changes:
+        changes["canonical_number"] = catalog.normalise_number(changes["canonical_number"])
+    # field katalog: hanya yang dikirim; null = kosongkan
+    sent = body.model_fields_set
+    if "year" in sent:
+        _check_year(body.year)
+        changes["year"] = body.year
+    for f in ("enacted_date", "promulgated_date"):
+        if f in sent:
+            changes[f] = getattr(body, f)
+    if "gazette_ref" in sent:
+        changes["gazette_ref"] = (body.gazette_ref or "").strip() or None
     new_number = changes.get("canonical_number")
     if new_number and new_number != doc.canonical_number:
         frozen = db.scalar(select(func.count()).select_from(DocumentVersion).where(
@@ -314,7 +364,7 @@ def update_document(doc_id: str, body: DocumentUpdate, db: Session = Depends(get
             raise AppError(409, "DUPLICATE", "Nomor regulasi sudah terdaftar")
     for k, v in changes.items():
         setattr(doc, k, v)
-    after = {k: getattr(doc, k) for k in before}
+        after = _doc_snapshot(doc)
     if after == before:
         return ResponseWrapper(data={"id": str(doc.id), "changed": False})
     audit(db, user.id, "DOCUMENT_UPDATED", "document", doc.id, before=before, after=after)
@@ -392,9 +442,58 @@ def publish(version_id: str, db: Session = Depends(get_db),
 
 
 @router.get("/api/v1/corpus/search", response_model=ResponseWrapper[list])
-def search(q: str, limit: int = 10, db: Session = Depends(get_db),
+def search(q: str, limit: int = Query(10, ge=1, le=50), instrument_type: Optional[str] = None,
+           status: Optional[str] = None, year: Optional[int] = Query(None, ge=1945, le=2100),
+           issuer: Optional[str] = None, as_of: Optional[date] = None, db: Session = Depends(get_db),
            _: AppUser = Depends(require("corpus_search", "R"))):  # Pencarian korpus: semua peran
-    return ResponseWrapper(data=services.search_provisions(db, q, min(limit, 50)))
+    return ResponseWrapper(data=catalog.search_provisions(db, q, limit, instrument_type=instrument_type or None,
+                                                          status=status or None, year=year, issuer=issuer or None,
+                                                          as_of=as_of))
+
+
+@router.get("/api/v1/corpus/catalog", response_model=ResponseWrapper[dict])
+def catalog_search(q: Optional[str] = None, instrument_type: Optional[str] = None, status: Optional[str] = None,
+                   year: Optional[int] = Query(None, ge=1945, le=2100), issuer: Optional[str] = None,
+                   label: Optional[str] = None, sort: str = Query("newest", pattern="^(newest|oldest|title)$"),
+                   limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: Session = Depends(get_db),
+                   _: AppUser = Depends(require("corpus_search", "R"))):
+    return ResponseWrapper(data=catalog.search_documents(
+        db, q, instrument_type=instrument_type or None, status=status or None, year=year, issuer=issuer or None,
+        label=label or None, sort=sort, limit=limit, offset=offset))
+
+
+@router.get("/api/v1/corpus/facets", response_model=ResponseWrapper[dict])
+def catalog_facets(db: Session = Depends(get_db), _: AppUser = Depends(require("corpus_search", "R"))):
+    return ResponseWrapper(data=catalog.facets(db))
+
+
+@router.get("/api/v1/corpus/documents/{doc_id}", response_model=ResponseWrapper[dict])
+def get_document(doc_id: str, db: Session = Depends(get_db), _: AppUser = Depends(require("corpus_search", "R"))):
+    return ResponseWrapper(data=catalog.document_detail(db, _get(db, Document, doc_id)))
+
+
+@router.get("/api/v1/corpus/documents/{doc_id}/as-of", response_model=ResponseWrapper[dict])
+def document_as_of(doc_id: str, as_of: date, db: Session = Depends(get_db),
+                   _: AppUser = Depends(require("corpus_search", "R"))):
+    return ResponseWrapper(data=catalog.provisions_as_of(db, _get(db, Document, doc_id), as_of))
+
+
+@router.patch("/api/v1/corpus/versions/{version_id}", response_model=ResponseWrapper[dict])
+def update_version(version_id: str, body: VersionUpdate, db: Session = Depends(get_db),
+                   user: AppUser = Depends(require("ingestion", "X"))):  # sama dengan hak unggah versi
+    """Perbaiki tanggal berlaku versi yang MASIH DRAF. Versi terbit imutabel: tarik lalu unggah ulang."""
+    dv = _get(db, DocumentVersion, version_id)
+    if dv.state not in (VersionState.SEGMENTED_DRAFT.value, VersionState.UNDER_CORRECTION.value):
+        raise AppError(409, "VERSION_FROZEN", f"Versi berstatus {dv.state}; hanya versi draf yang tanggalnya dapat diubah. "
+                       "Untuk versi terbit: tarik versi lalu unggah ulang.")
+    if dv.effective_date != body.effective_date:
+        before = dv.effective_date
+        dv.effective_date = body.effective_date
+        audit(db, user.id, "VERSION_DATE_CHANGED", "document_version", dv.id,
+              before={"effective_date": str(before)}, after={"effective_date": str(body.effective_date)})
+        db.commit()
+        _share(db, dv.document_id)
+    return ResponseWrapper(data={"version_id": str(dv.id), "effective_date": str(dv.effective_date)})
 
 
 @router.post("/api/v1/corpus/changes", response_model=ResponseWrapper[dict])

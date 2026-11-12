@@ -43,6 +43,11 @@ class Document(Base):
     status = Column(String, nullable=False, default="DRAFT")
     # waktu dokumen didaftarkan; dipakai untuk mengurutkan daftar korpus (terbaru di atas)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+        # metadata katalog (migrasi 008) — semua boleh kosong
+    year = Column(Integer)                  # tahun peraturan; diisi otomatis dari nomor bila kosong
+    enacted_date = Column(Date)             # tanggal penetapan
+    promulgated_date = Column(Date)         # tanggal pengundangan
+    gazette_ref = Column(String)            # rujukan lembaran/berita negara
 
 
 class DocumentVersion(Base):

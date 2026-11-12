@@ -99,6 +99,7 @@ export const can = (role: Role, action: string): boolean => {
 const PAGE_READ: Record<string, [string, string][]> = {
   beranda: [["dashboard", "R"]], cari: [["corpus_search", "R"]], copilot: [["copilot_query", "X"]],
   regulasi: [["source_registry", "R"], ["document_version", "R"]], perubahan: [["change_review", "R"]],
+    katalog: [["corpus_search", "R"]], peraturan: [["corpus_search", "R"]],  // Katalog peraturan & halaman detail (semua peran)
   keberlakuan: [["applicability", "R"]], kewajiban: [["obligation", "R"]], kontrol: [["control_library", "R"]],
   asesmen: [["assessment_conclusion", "R"]], temuan: [["finding", "R"]], laporan: [["report_published", "R"]],
   audit: [["audit_trail", "R"]], admin: [["system_config", "R"], ["user_admin", "R"]],
@@ -167,4 +168,13 @@ export function PasalText({ text, className = "" }: { text: string; className?: 
     <div key={i} className={l.mark ? "pasal-item" : "pasal-para"} style={{ marginLeft: `${l.depth * 1.6}em` }}>
       {l.mark && <span className="pasal-mark">{l.mark}</span>}<span>{l.text}</span>
     </div>)}</div>;
+}
+/** Jenis instrumen yang bisa dipilih di form dokumen (SEOJK = Surat Edaran OJK, SEBI = Surat Edaran BI). */
+export const INSTRUMENT_TYPES = ["UU", "PERPPU", "PP", "PERPRES", "KEPPRES", "PMK", "PERMEN", "POJK", "SEOJK", "PADK", "PDK",
+  "PBI", "PADG", "SEBI", "PPATK", "PERDA", "PUTUSAN", "OTHER"];
+
+/** Cuplikan hasil pencarian: bagian yang cocok dibungkus [[...]] oleh server → ditandai dengan <mark>. */
+export function Highlight({ text }: { text: string }) {
+  return <>{text.split(/(\[\[[\s\S]*?\]\])/g).map((p, i) =>
+    p.startsWith("[[") && p.endsWith("]]") ? <mark key={i}>{p.slice(2, -2)}</mark> : <span key={i}>{p}</span>)}</>;
 }

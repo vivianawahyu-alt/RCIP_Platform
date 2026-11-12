@@ -33,7 +33,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import func, select
-
+from app.corpus.catalog import extract_year
 from app.corpus.models import (Document, DocumentVersion, Provision, ProvisionVersion, RegulatorySource,
                                TaxonomyLabel)
 from app.platform.governance import audit
@@ -84,6 +84,24 @@ def _write(path: Path, data: dict) -> None:
     text = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if not path.exists() or path.read_text(encoding="utf-8") != text:  # tidak menulis bila isinya sama
         path.write_text(text, encoding="utf-8")
+        
+# metadata katalog (migrasi 008) yang ikut disinkronkan lewat dokumen.json
+CATALOG_KEYS = ("year", "enacted_date", "promulgated_date", "gazette_ref")
+
+
+def _apply_catalog(doc: Document, meta: dict, overwrite: bool) -> None:
+    """overwrite=True (file lebih baru / dokumen baru): ikuti file; False: hanya mengisi yang masih kosong.
+    File lama tanpa kunci ini tidak menghapus apa pun; tahun yang kosong diambil dari akhir nomor regulasi."""
+    for k in CATALOG_KEYS:
+        if k not in meta:
+            continue
+        v = meta[k]
+        if k in ("enacted_date", "promulgated_date") and v:
+            v = date.fromisoformat(v)
+        if overwrite or getattr(doc, k) is None:
+            setattr(doc, k, v)
+    if doc.year is None:
+        doc.year = extract_year(doc.canonical_number)
 
 
 def _meta_revision(db, doc: Document) -> str:
@@ -164,13 +182,16 @@ def export_document(db, doc: Document) -> int:
     src = db.get(RegulatorySource, doc.source_id)
     if old and old.get("meta_updated_at") and _ts(old["meta_updated_at"]) > _ts(_meta_revision(db, doc)):
         # data dokumen di folder lebih baru (diubah di laptop lain, belum diimpor di sini) → pertahankan
-        doc_fields = {k: old[k] for k in ("instrument_type", "issuer", "title_id", "meta_updated_at")}
+                doc_fields.update({k: old.get(k) for k in CATALOG_KEYS})
     else:
         doc_fields = {}
     _write(meta_path, {
         "format": FORMAT, "id": old.get("id", str(doc.id)),
         "canonical_number": doc.canonical_number, "instrument_type": doc.instrument_type, "issuer": doc.issuer,
         "title_id": doc.title_id, "created_at": old.get("created_at", _iso(doc.created_at)),
+                "year": doc.year, "enacted_date": doc.enacted_date.isoformat() if doc.enacted_date else None,
+        "promulgated_date": doc.promulgated_date.isoformat() if doc.promulgated_date else None,
+        "gazette_ref": doc.gazette_ref,
         "meta_updated_at": _meta_revision(db, doc),  # perubahan judul/jenis/penerbit terbaru menang di laptop lain
         "deleted_at": None,  # dokumen ada di laptop ini → bukan penanda hapus
         "source": {"name": src.name, "category": src.category, "issuer_name": src.issuer_name,
@@ -422,11 +443,14 @@ def _import_document(db, folder: Path, stats: dict) -> None:
                        canonical_number=meta["canonical_number"], instrument_type=meta["instrument_type"],
                        issuer=meta["issuer"], title_id=meta["title_id"], status="DRAFT",
                        created_at=_ts(meta["created_at"]))
+        _apply_catalog(doc, meta, overwrite=True)
+
         db.add(doc)
         db.flush()
         audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name, "created": True,
                                                                 "meta_updated_at": meta.get("meta_updated_at")})
         stats["dokumen_baru"] += 1
+        
     elif meta.get("meta_updated_at") and _ts(meta["meta_updated_at"]) > _ts(_meta_revision(db, doc)):
         # judul / jenis / penerbit diubah di laptop lain lebih baru → terapkan di sini
         doc.title_id, doc.instrument_type, doc.issuer = meta["title_id"], meta["instrument_type"], meta["issuer"]
@@ -443,6 +467,13 @@ def _import_document(db, folder: Path, stats: dict) -> None:
                                  state=lb["state"], source=lb.get("source") or "RULE", reason=lb.get("reason")))
         elif lb["state"] == "CONFIRMED" and cur.state != "CONFIRMED":
             cur.state = "CONFIRMED"
+            doc.title_id, doc.instrument_type, doc.issuer = meta["title_id"], meta["instrument_type"], meta["issuer"]
+        _apply_catalog(doc, meta, overwrite=True)
+        audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name,
+                                                                "meta_updated_at": meta.get["meta_updated_at"]})
+        stats["dokumen_diperbarui"] += 1
+    else:  # tidak lebih baru: hanya isi metadata katalog yang masih kosong
+        _apply_catalog(doc, meta, overwrite=False)
 
     local = {dv.sha256: dv for dv in db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == doc.id))}
     files = [_read(p) for p in sorted((folder / "versi").glob("*.json"))] if (folder / "versi").exists() else []

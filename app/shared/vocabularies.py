@@ -6,11 +6,52 @@ class SourceCategory(StrEnum):
     OJK = "OJK"
     BANK_INDONESIA = "BANK_INDONESIA"
     PERATURAN_JDIH = "PERATURAN_JDIH"
+    PPATK = "PPATK"
+    KEMENKEU = "KEMENKEU"
+    KOMDIGI = "KOMDIGI"
+    OTHER = "OTHER"
 
 
 class InstrumentType(StrEnum):
-    UU = "UU"; PP = "PP"; POJK = "POJK"; SEOJK = "SEOJK"; PADK = "PADK"
-    PDK = "PDK"; PBI = "PBI"; PADG = "PADG"; OTHER = "OTHER"
+    POJK = "POJK"
+    PBI = "PBI"
+    PP = "PP"
+    PERPRES = "PERPRES"
+    UU = "UU"
+    PO = "PO"
+    
+INSTRUMENT_PRESETS = {
+    "OJK": {
+        "issuer": "Otoritas Jasa Keuangan",
+        "source_category": "OJK",
+        "base_url": "https://www.ojk.go.id",
+    },
+    "BI": {
+        "issuer": "Bank Indonesia",
+        "source_category": "BANK_INDONESIA",
+        "base_url": "https://www.bi.go.id",
+    },
+    "PEMERINTAH": {
+        "issuer": "Pemerintah Republik Indonesia",
+        "source_category": "PERATURAN_JDIH",
+        "base_url": "https://peraturan.go.id",
+    },
+    "PPATK": {
+        "issuer": "Pusat Pelaporan dan Analisis Transaksi Keuangan",
+        "source_category": "PPATK",
+        "base_url": "https://www.ppatk.go.id",
+    },
+    "KEMENKEU": {
+        "issuer": "Kementerian Keuangan",
+        "source_category": "KEMENKEU",
+        "base_url": "https://jdih.kemenkeu.go.id",
+    },
+    "KOMDIGI": {
+        "issuer": "Kementerian Komunikasi dan Digital",
+        "source_category": "KOMDIGI",
+        "base_url": "https://jdih.komdigi.go.id",
+    },
+}
 
 
 class DocumentStatus(StrEnum):

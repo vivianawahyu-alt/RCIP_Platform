@@ -4,6 +4,7 @@ export type Me = { username: string; role: Role; user_id: string };
 export type User = { id: string; username: string; role: Role };
 export type Citation = { provision_version_id: string; canonical_number: string; number_label: string };
 export type Doc = { id: string; canonical_number: string; title_id: string; status: string; instrument_type: string; issuer?: string;
+    year?: number | null; enacted_date?: string | null; promulgated_date?: string | null; gazette_ref?: string | null;
   labels?: { dimension: string; value: string; state: string }[];
   created_at?: string;
   // [A1] sumber asal dokumen (registri sumber, FR-RKM-001)
@@ -47,3 +48,21 @@ export type Finding = { id: string; title: string; description: string; kind: st
   assessment_id?: string | null; closure: { submitted_by?: string | null; submitted_at?: string | null; closed_by?: string | null; closed_at?: string | null; rationale?: string | null };
   risk_acceptance?: { rationale: string; accepted_by?: string | null; review_date?: string | null } | null; reopened_count: number;
   actions: Action[]; action_count?: number; approvals?: any[]; timeline?: any[] };
+  export type Facet = { value: string | number; count: number };
+export type Facets = { instrument_type: Facet[]; status: Facet[]; issuer: Facet[]; year: Facet[];
+  label: { dimension: string; value: string; count: number }[] };
+export type CatalogItem = { id: string; canonical_number: string; number_display: string; title_id: string; instrument_type: string;
+  issuer: string; status: string; year: number | null; enacted_date: string | null; promulgated_date: string | null;
+  gazette_ref: string | null; labels: { dimension: string; value: string; state: string }[];
+  version_count: number; published_count: number; latest_effective_date: string | null };
+export type CatalogPage = { total: number; limit: number; offset: number; items: CatalogItem[] };
+export type Relation = { id: string; relation_type: string; direction: "out" | "in"; label: string; state: string; note: string | null;
+  other: { id: string; canonical_number: string; title_id: string; status: string } };
+export type DocDetail = Omit<CatalogItem, "version_count" | "published_count" | "latest_effective_date"> & {
+  source: { id: string; name: string; status: string } | null;
+  versions: { id: string; version_number: number; state: string; effective_date: string; extraction_method?: string; provision_count: number;
+    origin_url: string | null; file_name: string | null; size_bytes: number | null; has_file: boolean }[];
+  relations: Relation[]; cited_by: Relation[] };
+export type AsOf = { as_of: string; version: { id: string; version_number: number; effective_date: string } | null;
+  later_version: string | null; earliest_effective_date: string | null;
+  provisions: { provision_version_id: string; number_label: string; path: string; text: string }[] };

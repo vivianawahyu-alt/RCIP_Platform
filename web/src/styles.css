@@ -280,3 +280,8 @@ mark { background: var(--seal-soft); color: inherit; border-bottom: 2px solid va
 dl.kv { display: grid; grid-template-columns: minmax(120px, 34%) 1fr; gap: 4px 12px; margin: 0; }
 dl.kv dt { color: var(--muted); }
 dl.kv dd { margin: 0; word-break: break-word; }
+/* ---- Katalog peraturan: kotak filter & ringkasan metadata ---- */
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
+.doc-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; font-size: 14px; margin: 0; }
+.doc-meta dt { color: var(--muted); }
+.doc-meta dd { margin: 0; }
