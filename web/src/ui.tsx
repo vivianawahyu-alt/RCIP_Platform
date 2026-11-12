@@ -104,11 +104,26 @@ const PAGE_READ: Record<string, [string, string][]> = {
   asesmen: [["assessment_conclusion", "R"]], temuan: [["finding", "R"]], laporan: [["report_published", "R"]],
   audit: [["audit_trail", "R"]], admin: [["system_config", "R"], ["user_admin", "R"]],
   sumber: [["source_registry", "R"]],  // [A19] halaman Sumber regulasi
+  "kontrol-saya": [["control_library", "R"]],
 };
 /** [A18] log interaksi copilot: Promosi keluaran copilot (R) atau Jejak audit (R) — sama dengan server */
 export const canReadCopilotLog = (role: Role) => canDo(role, "copilot_promote", "R") || canDo(role, "audit_trail", "R");
-export const canSeePage = (role: Role, page: string): boolean =>
-  (PAGE_READ[page] || [["dashboard", "R"]]).some(([c, l]) => canDo(role, c, l));
+/** Halaman yang hanya untuk peran tertentu. */
+const ONLY_ROLE: Record<string, Role[]> = { "kontrol-saya": ["BUSINESS_CONTROL_OWNER"] };
+/** Peran dengan layar khusus (sesuai mockup): hanya rute ini yang bisa dibuka. Hanya penataan UI; server tetap menegakkan RBAC. */
+const ROLE_ROUTES: Partial<Record<Role, string[]>> = {
+  EXECUTIVE: ["beranda", "laporan", "cari", "peraturan"],
+  BUSINESS_CONTROL_OWNER: ["kontrol-saya", "temuan", "cari", "peraturan"],
+};
+/** Halaman awal setelah login. */
+export const homeRoute = (role: Role): string => (role === "BUSINESS_CONTROL_OWNER" ? "kontrol-saya" : "beranda");
+
+export const canSeePage = (role: Role, page: string): boolean => {
+  if (ONLY_ROLE[page] && !ONLY_ROLE[page].includes(role)) return false;
+  const allowed = ROLE_ROUTES[role];
+  if (allowed && !allowed.includes(page)) return false;
+  return (PAGE_READ[page] || [["dashboard", "R"]]).some(([c, l]) => canDo(role, c, l));
+};
 
 export function ImpactIcon({ level }: { level: "high" | "medium" | "low" }) {
   const c = level === "high" ? "#b42318" : level === "medium" ? "#b54708" : "#667085";
