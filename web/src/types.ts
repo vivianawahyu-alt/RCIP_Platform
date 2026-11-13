@@ -27,6 +27,7 @@ export type Obligation = { id: string; state: string; summary: string; deadline:
   confidence?: number | null; owner_id?: string | null; owner?: string | null; validator?: string | null; approver?: string | null;
   frequency?: string | null; original_text?: string; created_at?: string; citation: Citation;
   supporting_phrases?: string[]; model_id?: string | null; low_confidence?: boolean; reopen_reason?: string | null;
+  legal_question?: string | null; legal_answer?: string | null; legal_reviewer?: string | null;
   required_actions?: string[]; ai?: { template: string; model_id: string; schema_valid: boolean; grounding_passed: boolean; confidence: number | null } | null };
 export type Risk = { id: string; obligation_id: string; title: string; severity: string; obligation_summary?: string };
 export type Control = { id: string; risk_id?: string | null; risk_title?: string | null; title: string; owner_id?: string | null;

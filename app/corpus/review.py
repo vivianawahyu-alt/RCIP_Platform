@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names
+from app.compliance.common import get_or_404, iso, now, require_citations, require_text, sid, user_names
 from app.compliance.models import ApplicabilityDecision, Control, Obligation, ObligationControlMap
 from app.corpus.models import (Change, ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, Relationship,
                                TaxonomyLabel)
@@ -74,6 +74,7 @@ class QuestionIn(BaseModel):
 
 class AnswerIn(BaseModel):
     answer: str
+    citation_provision_version_ids: list[str] = []  # wajib ≥ 1 (FRD Eksibit 26); divalidasi require_citations
 
 
 class DecisionIn(BaseModel):
@@ -168,7 +169,7 @@ def validate_change(cid: str, body: ValidateChangeIn, db: Session = Depends(get_
 def escalate_change(cid: str, body: QuestionIn, db: Session = Depends(get_db), user: AppUser = Depends(CHANGE_MAKER)):
     c = _change(db, cid, {"DETECTED", "IN_REVIEW"})
     c.legal_question, c.review_state = require_text(body.question, "question"), "ESCALATED"
-    audit(db, user.id, "CHANGE_ESCALATED", "change", c.id, after={"question": c.legal_question})
+    audit(db, user.id, "CHANGE_ESCALATED_TO_LEGAL", "change", c.id, after={"question": c.legal_question})
     db.commit()
     return ResponseWrapper(data={"id": str(c.id), "review_state": c.review_state})
 
@@ -176,8 +177,11 @@ def escalate_change(cid: str, body: QuestionIn, db: Session = Depends(get_db), u
 @router.post("/changes/{cid}/legal-answer", response_model=ResponseWrapper[dict])
 def answer_change(cid: str, body: AnswerIn, db: Session = Depends(get_db), user: AppUser = Depends(CHANGE_LEGAL)):
     c = _change(db, cid, {"ESCALATED"})
-    c.legal_answer, c.review_state = require_text(body.answer, "answer"), "IN_REVIEW"
-    audit(db, user.id, "CHANGE_LEGAL_POSITION", "change", c.id, after={"answer": c.legal_answer})
+    answer = require_text(body.answer, "answer")
+    labels = require_citations(db, body.citation_provision_version_ids)
+    c.legal_answer, c.review_state = f"{answer}\n\nSitasi: {'; '.join(labels)}", "IN_REVIEW"
+    audit(db, user.id, "LEGAL_POSITION_RECORDED", "change", c.id,
+          after={"answer": answer, "citation_provision_version_ids": body.citation_provision_version_ids})
     db.commit()
     return ResponseWrapper(data={"id": str(c.id), "review_state": c.review_state})
 
@@ -254,7 +258,7 @@ def list_relationships(document_id: Optional[str] = None, db: Session = Depends(
         stmt = stmt.where((Relationship.source_document_id == document_id) | (Relationship.target_document_id == document_id))
     return ResponseWrapper(data=[{"id": str(r.id), "source": docs.get(str(r.source_document_id)),
                                   "target": docs.get(str(r.target_document_id)), "relation_type": r.relation_type,
-                                  "state": r.state, "note": r.note, "proposed_by": names.get(sid(r.proposed_by)),
+                                  "state": r.state, "note": r.note, "proposed_by": names.get(sid(r.proposed_by)), "proposed_by_id": sid(r.proposed_by),
                                   "confirmed_by": names.get(sid(r.confirmed_by)),
                                   "source_document_id": str(r.source_document_id),
                                   "target_document_id": str(r.target_document_id),

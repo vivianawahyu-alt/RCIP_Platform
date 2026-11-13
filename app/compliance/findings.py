@@ -256,8 +256,7 @@ def finding_detail(fid: str, db: Session = Depends(get_db), user: AppUser = Depe
 def create_finding(body: FindingIn, db: Session = Depends(get_db), user: AppUser = Depends(FINDING_CREATE)):
     """FR-EVR-004: temuan manual wajib tertaut ke kewajiban, memiliki severity dan pemilik."""
     ob = get_or_404(db, Obligation, body.obligation_id)
-    if ob.state in (V.ObligationState.AI_DRAFT.value, V.ObligationState.IN_VALIDATION.value):
-        raise AppError(409, "AI_DRAFT_BLOCKED", "Temuan tidak dapat ditautkan ke kewajiban yang belum divalidasi")
+    if ob.state in (V.ObligationState.AI_DRAFT.value, V.ObligationState.IN_VALIDATION.value, V.ObligationState.PENDING_LEGAL.value):        raise AppError(409, "AI_DRAFT_BLOCKED", "Temuan tidak dapat ditautkan ke kewajiban yang belum divalidasi")
     get_or_404(db, AppUser, body.owner_id)
     if body.control_id:
         get_or_404(db, Control, body.control_id)
