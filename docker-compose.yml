@@ -34,7 +34,8 @@ services:
 
   api:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # migrasi database dijalankan otomatis setiap api menyala, lalu server dimulai
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     env_file: .env
     volumes: [".:/app"]
     ports: ["8000:8000"]
