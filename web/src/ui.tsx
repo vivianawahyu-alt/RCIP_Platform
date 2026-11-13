@@ -34,7 +34,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 const STATE_LABEL: Record<string, [string, string]> = {
-  AI_DRAFT: ["Draf AI", "ai"], IN_VALIDATION: ["Validasi", "amber"], PENDING_APPROVAL: ["Menunggu persetujuan", "blue"],
+  AI_DRAFT: ["Draf AI", "ai"], IN_VALIDATION: ["Validasi", "amber"], PENDING_LEGAL: ["Menunggu Peninjau Hukum", "amber"], PENDING_APPROVAL: ["Menunggu persetujuan", "blue"],
   ACTIVE: ["Aktif", "green"], PENDING_USE_REVIEW: ["Reviu penggunaan", "blue"], SUSPENDED: ["Ditangguhkan", "red"], REVIEW_REQUIRED: ["Perlu ditinjau", "red"], SUPERSEDED: ["Digantikan", ""], RETIRED: ["Pensiun", ""],
   OPEN: ["Terbuka", "red"], ACTION_PLANNED: ["Tindakan direncanakan", "amber"], IN_REMEDIATION: ["Dalam remediasi", "blue"],
   PENDING_CLOSURE_VALIDATION: ["Menunggu validasi penutupan", "teal"], CLOSED: ["Ditutup", "green"], RISK_ACCEPTED: ["Risiko diterima", "amber"],

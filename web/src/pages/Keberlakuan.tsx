@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { CitationPicker } from "../CitationPicker";
+import type { Cite } from "../CitationPicker";
 import type { Doc, User } from "../types";
 import type { Ctx } from "../ui";
 import { Empty, Flow, PageHead, Status, can, fmtDate, fmtTime, inDays, useAction, useLoad } from "../ui";
@@ -92,8 +94,7 @@ function NewDecision({ ctx, onDone }: { ctx: Ctx; onDone: () => void }) {
 }
 
 function DecisionCard({ d, ctx, onDone }: { d: any; ctx: Ctx; onDone: () => void }) {
-  const [txt, setTxt] = useState("");
-  const { run, busy } = useAction(ctx.notify, onDone);
+  const [txt, setTxt] = useState(""), [cites, setCites] = useState<Cite[]>([]);  const { run, busy } = useAction(ctx.notify, onDone);
   const role = ctx.me.role;
   return <section className="panel">
     <div className="between"><div><div className="title" style={{ fontWeight: 700 }}>{d.document} <span className="muted small">v{d.version_number}</span></div><div className="sub small muted">{d.title}</div></div>
@@ -104,17 +105,18 @@ function DecisionCard({ d, ctx, onDone }: { d: any; ctx: Ctx; onDone: () => void
       <span>Disusun {d.maker} {fmtTime(d.created_at)}</span>{d.approver && <span>Disetujui {d.approver} {fmtTime(d.decided_at)}</span>}
       {d.suggested_value && d.suggested_value !== d.decision_value && <span className="badge amber">Berbeda dari saran aturan ({VL[d.suggested_value]})</span>}
       {d.review_owner && <span>Kajian: {d.review_owner}, target {fmtDate(d.review_target_date)}</span>}</div>
-    {d.legal_question && <p className="small">Pertanyaan hukum: {d.legal_question}{d.legal_answer && <><br />Posisi hukum ({d.legal_reviewer}): {d.legal_answer}</>}</p>}
+    {d.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {d.legal_question}{d.legal_answer && <><br />Posisi hukum ({d.legal_reviewer}): {d.legal_answer}</>}</p>}
     {d.return_reason && d.state === "REJECTED_TO_MAKER" && <p className="small" style={{ color: "var(--red)" }}>Dikembalikan: {d.return_reason}</p>}
     {role === "COMPLIANCE_OFFICER" && ["IN_ASSESSMENT", "REJECTED_TO_MAKER"].includes(d.state) && <div className="row" style={{ marginTop: 8 }}>
       <button className="btn primary sm" disabled={busy} onClick={() => run(() => api(`/compliance/applicability/${d.id}/submit`, { method: "POST" }), "Diajukan ke Manajer Kepatuhan.")}>Ajukan persetujuan</button>
       <input className="grow" value={txt} onChange={e => setTxt(e.target.value)} placeholder="Pertanyaan untuk Peninjau Hukum" />
       <button className="btn sm" disabled={busy || !txt} onClick={() => run(() => api(`/compliance/applicability/${d.id}/escalate`, { body: { question: txt } }), "Dieskalasi ke Peninjau Hukum.")}>Eskalasi</button></div>}
     {role === "COMPLIANCE_OFFICER" && d.state === "REVIEW_REQUIRED" && <div style={{ marginTop: 8 }}><button className="btn sm" disabled={busy} onClick={() => run(() => api(`/compliance/applicability/${d.id}/reopen`, { method: "POST" }), "Draf baru dibuat; keputusan lama tetap berlaku sampai draf baru disetujui.")}>Buka kajian ulang</button></div>}
-    {role === "LEGAL_REVIEWER" && d.state === "PENDING_LEGAL" && <div className="decision"><h4>Posisi hukum</h4><div className="row">
-      <input className="grow" value={txt} onChange={e => setTxt(e.target.value)} placeholder="Posisi hukum beserta sitasi" />
-      <button className="btn primary" disabled={busy || !txt} onClick={() => run(() => api(`/compliance/applicability/${d.id}/legal-answer`, { body: { answer: txt } }), "Posisi hukum tercatat.")}>Kirim</button></div></div>}
-    {role === "COMPLIANCE_MANAGER" && d.state === "PENDING_APPROVAL" && <div className="decision"><h4>Persetujuan keberlakuan (titik kendali 2)</h4>
+    {role === "LEGAL_REVIEWER" && d.state === "PENDING_LEGAL" && <div className="decision"><h4>Posisi hukum</h4>
+      <div className="row"><input className="grow" value={txt} onChange={e => setTxt(e.target.value)} placeholder="Posisi hukum" /></div>
+      <CitationPicker value={cites} onChange={setCites} />
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn primary" disabled={busy || !txt.trim() || !cites.length} onClick={() => run(() => api(`/compliance/applicability/${d.id}/legal-answer`, { body: { answer: txt, citation_provision_version_ids: cites.map(x => x.id) } }), "Posisi hukum tercatat.")}>Kirim</button></div></div>}    {role === "COMPLIANCE_MANAGER" && d.state === "PENDING_APPROVAL" && <div className="decision"><h4>Persetujuan keberlakuan (titik kendali 2)</h4>
       {d.maker_id === ctx.me.user_id && <p className="small" style={{ color: "var(--red)" }}>Anda penyusun keputusan ini sehingga tidak dapat menyetujuinya.</p>}
       <div className="row"><input className="grow" value={txt} onChange={e => setTxt(e.target.value)} placeholder="Alasan (wajib bila dikembalikan)" />
         <button className="btn primary" disabled={busy} onClick={() => run(() => api(`/compliance/applicability/${d.id}/decision`, { body: { outcome: "APPROVED", reason: txt } }), "Keputusan disetujui dan menjadi catatan resmi.")}>Setujui</button>

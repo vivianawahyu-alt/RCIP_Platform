@@ -4,6 +4,8 @@ import { ApiError, api, openFile } from "../api";
 import type { Doc, Source } from "../types";
 import type { Ctx } from "../ui";
 import  {INSTRUMENT_TYPES,Empty, Flow, PageHead, PasalText, Status, can, fmtDate, useAction, useLoad } from "../ui";
+import { CitationPicker } from "../CitationPicker";
+import type { Cite } from "../CitationPicker";
 
 // [A10] jenis instrumen yang bisa dipilih (SEOJK = Surat Edaran OJK)
 const INSTRUMENTS = INSTRUMENT_TYPES;
@@ -312,84 +314,162 @@ function CorpusActions({ doc, busy, run, onRemoved, role }: { doc: Doc; busy: bo
 const CHANGE_LABEL: Record<string, string> = { TEXT_MODIFIED: "Teks diubah", PROVISION_ADDED: "Pasal ditambahkan", PROVISION_DELETED: "Pasal dihapus" };
 const SEMANTIC = ["DEADLINE_CHANGED", "OBLIGATION_ADDED", "OBLIGATION_REMOVED", "OBLIGATION_MODIFIED", "THRESHOLD_CHANGED", "SCOPE_CHANGED",
   "DEFINITION_CHANGED", "SANCTION_CHANGED", "EFFECTIVE_DATE_CHANGED", "EDITORIAL_ONLY"];
-const REVIEW_STEPS: [string, string][] = [["DETECTED", "Terdeteksi"], ["IN_REVIEW", "Direviu"], ["VALIDATED", "Divalidasi analis"], ["MATERIAL_CONFIRMED", "Material dikonfirmasi"]];
+const REVIEW_STEPS: [string, string][] = [["DETECTED", "Terdeteksi"], ["IN_REVIEW", "Direviu"], ["VALIDATED", "Dinilai material"], ["MATERIAL_CONFIRMED", "Dikonfirmasi Manajer"]];
+const RELATION_TYPES: [string, string][] = [["AMENDS", "AMENDS (mengubah)"], ["REVOKES", "REVOKES (mencabut)"],
+  ["PARTIALLY_REVOKES", "PARTIALLY_REVOKES (mencabut sebagian)"], ["REFERS_TO", "REFERS_TO (merujuk)"], ["IMPLEMENTS", "IMPLEMENTS (melaksanakan)"]];
+const published = (d?: Doc) => (d?.versions || []).filter(v => v.state === "PUBLISHED");
 
+// Halaman "Perubahan regulasi": bandingkan dua versi terbit (atas), nilai perubahan per pasal (kiri), relasi dokumen (kanan)
 export function Perubahan({ ctx }: { ctx: Ctx }) {
-  const [docs] = useLoad<Doc[]>(() => api("/corpus/documents"), [], ctx.notify);
+  const [docs, reloadDocs] = useLoad<Doc[]>(() => api("/corpus/documents"), [], ctx.notify);
   const [sets, reloadSets] = useLoad<any[]>(() => api("/corpus/changesets"), [], ctx.notify);
   const [sel, setSel] = useState<string | null>(null);
+  const [pick, setPick] = useState({ doc: "", from: "", to: "" });
   const { run, busy } = useAction(ctx.notify, reloadSets);
-  const analyst = can(ctx.me.role, "corpus_write");
-  const cmp = (d: Doc) => run(async () => {
-    const v = d.versions; const r = await api("/corpus/changes", { body: { base_version_id: v[v.length - 2].id, new_version_id: v[v.length - 1].id } });
+  const reviewer = ctx.me.role === "REGULATORY_ANALYST"; // FRD: hanya Analis yang menjalankan deteksi/perbandingan
+  const multi = docs?.filter(d => published(d).length > 1) || [];
+  const doc = multi.find(d => d.id === pick.doc);
+  const vers = published(doc);
+  // pilihan bawaan: dokumen pertama, dua versi terbit terakhir
+  useEffect(() => {
+    if (!pick.doc && multi.length) { const v = published(multi[0]); setPick({ doc: multi[0].id, from: v[v.length - 2].id, to: v[v.length - 1].id }); }
+  }, [multi.length]);
+  const chooseDoc = (id: string) => { const v = published(multi.find(d => d.id === id)); setPick({ doc: id, from: v[v.length - 2]?.id || "", to: v[v.length - 1]?.id || "" }); };
+  const cmp = () => run(async () => {
+    const r = await api<any>("/corpus/changes", { body: { base_version_id: pick.from, new_version_id: pick.to } });
     setSel(r.change_set_id);
-  }, "Perbandingan selesai. Perubahan belum berdampak apa pun sampai divalidasi analis dan dikonfirmasi Manajer.");
-  const multi = docs?.filter(d => d.versions.filter(v => v.state === "PUBLISHED").length > 1) || [];
+  }, "Perbandingan selesai. Perubahan belum berdampak apa pun sampai dinilai dan dikonfirmasi Manajer.");
   const current = sel || sets?.[0]?.id;
+  const currentSet = sets?.find(s => s.id === current);
+  const relDoc = doc || docs?.find(d => d.canonical_number === currentSet?.document);
+  const sameVersion = !pick.from || pick.from === pick.to;
   return <>
-    <PageHead crumbs="Pusat Regulasi" title="Perubahan regulasi" intro="Diff deterministik antarversi, lalu reviu manusia: analis memvalidasi jenis & materialitas, Manajer Kepatuhan mengonfirmasi (titik kendali 1). Hanya konfirmasi yang menandai kewajiban & keputusan terkait untuk ditinjau." />
+    <PageHead crumbs="Pusat Regulasi" title="Perubahan regulasi" intro="Diff antarversi, lalu reviu manusia: Analis memvalidasi jenis & materialitas, Manajer Kepatuhan mengonfirmasi (titik kendali 1). Peninjau Hukum menjawab eskalasi dengan posisi hukum beserta sitasi." />
+    {reviewer && <section className="panel" style={{ marginBottom: 20 }}>
+      {multi.length ? <div className="compare-bar">
+        <label className="field">Dokumen<select value={pick.doc} onChange={e => chooseDoc(e.target.value)}>
+          {multi.map(d => <option key={d.id} value={d.id}>{d.canonical_number} · {d.title_id}</option>)}</select></label>
+        <label className="field">Dari<select value={pick.from} onChange={e => setPick({ ...pick, from: e.target.value })}>
+          {vers.map(v => <option key={v.id} value={v.id}>v{v.version_number}</option>)}</select></label>
+        <label className="field">Ke<select value={pick.to} onChange={e => setPick({ ...pick, to: e.target.value })}>
+          {vers.map(v => <option key={v.id} value={v.id}>v{v.version_number}</option>)}</select></label>
+        <button className="btn primary" disabled={busy || sameVersion} onClick={cmp}>Bandingkan</button>
+      </div> : <p className="muted small" style={{ margin: 0 }}>Belum ada dokumen dengan dua versi terbit. Analis perlu mengunggah dan memublikasikan versi baru terlebih dahulu.</p>}
+    </section>}
     <div className="cols">
       <div>{current ? <ChangeSetView key={current} id={current} ctx={ctx} onChange={reloadSets} /> : <Empty>Belum ada perbandingan versi.</Empty>}</div>
       <aside>
+        {relDoc && docs && <RelasiPanel key={relDoc.id} doc={relDoc} docs={docs} ctx={ctx} onChange={reloadDocs} />}
         <section className="panel"><h2>Hasil perbandingan</h2>
           {sets?.length ? <ul className="list">{sets.map(s => <li key={s.id}><button className="rowlink" onClick={() => setSel(s.id)}>
             <div className="title">{s.document} · v{s.base_version} → v{s.new_version}</div>
             <div className="sub">{s.total} perubahan · {Object.entries(s.states).map(([k, v]) => `${v} ${k.toLowerCase().replace("_", " ")}`).join(", ")}</div>
           </button></li>)}</ul> : <Empty>Belum ada.</Empty>}
         </section>
-        {analyst && <section className="panel"><h2>Bandingkan versi</h2>
-          {multi.length ? <ul className="list">{multi.map(d => <li key={d.id} className="between"><span className="small"><b>{d.canonical_number}</b></span>
-            <button className="btn sm" disabled={busy} onClick={() => cmp(d)}>Bandingkan</button></li>)}</ul> : <p className="muted small">Tidak ada dokumen dengan dua versi terbit.</p>}
-        </section>}
       </aside>
     </div>
   </>;
 }
 
+// Daftar kartu perubahan. Peninjau Hukum secara bawaan hanya melihat yang menunggu posisi hukum.
 function ChangeSetView({ id, ctx, onChange }: { id: string; ctx: Ctx; onChange: () => void }) {
   const [cs, reload] = useLoad<any>(() => api(`/corpus/changesets/${id}`), [id], ctx.notify);
+  const [all, setAll] = useState(false);
   if (!cs) return <div className="panel">Memuat…</div>;
-  return <section className="panel">
-    <header><div><h2>{cs.document}: v{cs.base_version} → v{cs.new_version}</h2><p>{cs.title}</p></div></header>
-    {cs.changes.length ? <ul className="list">{cs.changes.map((c: any) => <ChangeItem key={c.id} c={c} ctx={ctx} onDone={() => { reload(); onChange(); }} />)}</ul> : <Empty>Tidak ada perubahan.</Empty>}
-  </section>;
+  const legal = ctx.me.role === "LEGAL_REVIEWER";
+  const shown = legal && !all ? cs.changes.filter((c: any) => c.review_state === "ESCALATED") : cs.changes;
+  return <>
+    <p className="small muted" style={{ margin: "0 0 10px" }}><b>{cs.document}</b> · v{cs.base_version} → v{cs.new_version} · {cs.title}</p>
+    {legal && <label className="small" style={{ display: "block", marginBottom: 10 }}><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} /> Tampilkan semua perubahan (bawaan: hanya yang menunggu posisi hukum)</label>}
+    {shown.length ? shown.map((c: any) => <ChangeItem key={c.id} c={c} ctx={ctx} onDone={() => { reload(); onChange(); }} />) : <Empty>{legal ? "Tidak ada eskalasi yang menunggu posisi hukum." : "Tidak ada perubahan."}</Empty>}
+  </>;
 }
 
+// Label status kartu: indikasi sistem sebelum dinilai, keputusan manusia sesudahnya
+function changeBadge(c: any) {
+  if (c.review_state === "MATERIAL_CONFIRMED") return <span className="badge red">Material · dikonfirmasi</span>;
+  if (c.review_state === "VALIDATED") return <span className="badge red">Material · menunggu Manajer</span>;
+  if (c.review_state === "REJECTED") return <span className="badge">Bukan material</span>;
+  if (c.review_state === "ESCALATED") return <span className="badge amber">Menunggu posisi hukum</span>;
+  return c.is_material ? <span className="badge red" title="Indikasi deterministik, bukan keputusan">Material · {(CHANGE_LABEL[c.change_type] || "berubah").toLowerCase()}</span>
+    : <span className="badge amber">Perlu ditinjau</span>;
+}
+
+// Satu kartu perubahan beserta tombolnya
 function ChangeItem({ c, ctx, onDone }: { c: any; ctx: Ctx; onDone: () => void }) {
-  const [f, setF] = useState({ material: c.is_material, semantic_type: c.change_type === "PROVISION_ADDED" ? "OBLIGATION_ADDED" : "DEADLINE_CHANGED", reason: "" });
-  const [q, setQ] = useState(""), [why, setWhy] = useState("");
+  const [f, setF] = useState({ semantic_type: c.change_type === "PROVISION_ADDED" ? "OBLIGATION_ADDED" : "DEADLINE_CHANGED", reason: "" });
+  const [q, setQ] = useState(""), [why, setWhy] = useState(""), [cites, setCites] = useState<Cite[]>([]);
   const { run, busy } = useAction(ctx.notify, onDone);
   const role = ctx.me.role;
-  return <li>
-    <div className="between"><div className="row"><b style={{ fontFamily: "var(--serif)" }}>{c.provision}</b><span className="badge">{CHANGE_LABEL[c.change_type] || c.change_type}</span>
-      {c.is_material ? <span className="badge amber" title="Indikasi deterministik, bukan keputusan">Indikasi material</span> : <span className="badge">Indikasi non-material</span>}
-      <span className="small muted">kemiripan {c.similarity}</span></div><Status s={c.review_state} /></div>
-    {c.review_state !== "REJECTED" && c.review_state !== "ESCALATED" && <div style={{ marginTop: 8 }}><Flow steps={REVIEW_STEPS} now={c.review_state} /></div>}
+  const open = ["DETECTED", "IN_REVIEW"].includes(c.review_state);
+  const decide = (material: boolean) => run(() => api(`/corpus/changes/${c.id}/validate`,
+    { body: { material, semantic_type: material ? f.semantic_type : "EDITORIAL_ONLY", reason: f.reason } }),
+    material ? "Dinilai material; menunggu konfirmasi Manajer Kepatuhan." : "Dicatat bukan material.");
+  return <section className="panel change-card">
+    <div className="between"><div className="row"><b className="change-title">{c.provision}</b>{changeBadge(c)}</div>
+      <span className="small muted">kemiripan {c.similarity}</span></div>
     {/* diff_html di-escape di server; hanya tag <ins>/<del> yang dihasilkan */}
     {c.diff_html && <div className="verbatim" dangerouslySetInnerHTML={{ __html: c.diff_html }} />}
-    {c.review_reason && <p className="small">Analis {c.validated_by}: {c.semantic_type} — {c.review_reason}</p>}
-    {c.legal_question && <p className="small">Pertanyaan hukum: {c.legal_question}{c.legal_answer && <><br />Posisi hukum: {c.legal_answer}</>}</p>}
+    {c.review_state !== "REJECTED" && c.review_state !== "ESCALATED" && <div style={{ marginTop: 8 }}><Flow steps={REVIEW_STEPS} now={c.review_state} /></div>}
+    {c.review_reason && <p className="small">Dinilai oleh {c.validated_by}: {c.semantic_type} — {c.review_reason}</p>}
+    {c.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {c.legal_question}{c.legal_answer && <><br />Posisi hukum: {c.legal_answer}</>}</p>}
     {c.return_reason && <p className="small" style={{ color: "var(--red)" }}>Dikembalikan Manajer: {c.return_reason}</p>}
     {c.review_state === "MATERIAL_CONFIRMED" && <div className="notice ok"><span>Dikonfirmasi {c.confirmed_by}. Ditandai untuk ditinjau: {c.impact?.obligations?.length || 0} kewajiban, {c.impact?.applicability_decisions?.length || 0} keputusan keberlakuan, {c.impact?.controls?.length || 0} kontrol.{c.impact?.note ? ` ${c.impact.note}` : ""}</span></div>}
-    {role === "REGULATORY_ANALYST" && ["DETECTED", "IN_REVIEW"].includes(c.review_state) && <div className="decision"><h4>Validasi perubahan</h4><div className="form">
+
+    {/* Maker: Analis Regulasi menilai materialitas (FRD Eksibit 26; alasan wajib, tercatat di audit) */}
+    {role === "REGULATORY_ANALYST" && open && <div className="decision">
       <div className="form-2">
-        <label className="field">Penilaian materialitas<select value={f.material ? "1" : "0"} onChange={e => setF({ ...f, material: e.target.value === "1" })}><option value="1">Material — ajukan konfirmasi</option><option value="0">Tidak material — tolak</option></select></label>
-        <label className="field">Jenis perubahan<select value={f.semantic_type} onChange={e => setF({ ...f, semantic_type: e.target.value })}>{SEMANTIC.map(x => <option key={x}>{x}</option>)}</select></label>
+        <label className="field">Jenis perubahan (bila material)<select value={f.semantic_type} onChange={e => setF({ ...f, semantic_type: e.target.value })}>{SEMANTIC.map(x => <option key={x}>{x}</option>)}</select></label>
+        <label className="field">Alasan (wajib)<input value={f.reason} onChange={e => setF({ ...f, reason: e.target.value })} placeholder="mis. tenggat pelaporan dipercepat" /></label>
       </div>
-      <label className="field">Alasan<input value={f.reason} onChange={e => setF({ ...f, reason: e.target.value })} placeholder="mis. tenggat pelaporan dipercepat" /></label>
-      <div className="row"><button className="btn primary" disabled={busy || !f.reason} onClick={() => run(() => api(`/corpus/changes/${c.id}/validate`, { body: f }), "Penilaian perubahan tersimpan.")}>Simpan validasi</button>
-        <input className="grow" value={q} onChange={e => setQ(e.target.value)} placeholder="Pertanyaan untuk Peninjau Hukum" />
+      <div className="row" style={{ marginTop: 10 }}>
+        <button className="btn primary" disabled={busy || !f.reason} onClick={() => decide(true)}>Konfirmasi material</button>
+        <button className="btn" disabled={busy || !f.reason} onClick={() => decide(false)}>Bukan material</button>
+      </div>
+      <div className="row" style={{ marginTop: 10 }}>
+        <input className="grow" value={q} onChange={e => setQ(e.target.value)} placeholder="Ragu? Tulis pertanyaan untuk Peninjau Hukum" />
         <button className="btn" disabled={busy || !q} onClick={() => run(() => api(`/corpus/changes/${c.id}/escalate`, { body: { question: q } }), "Diteruskan ke Peninjau Hukum.")}>Eskalasi</button></div>
-    </div></div>}
+    </div>}
+    {/* Penasihat: Peninjau Hukum menjawab eskalasi dengan posisi hukum beserta sitasi (FRD Eksibit 26) */}
     {role === "LEGAL_REVIEWER" && c.review_state === "ESCALATED" && <div className="decision"><h4>Posisi hukum</h4>
-      <div className="row"><input className="grow" value={why} onChange={e => setWhy(e.target.value)} placeholder="Posisi hukum beserta sitasi" />
-        <button className="btn primary" disabled={busy || !why} onClick={() => run(() => api(`/corpus/changes/${c.id}/legal-answer`, { body: { answer: why } }), "Posisi hukum tercatat; kembali ke analis.")}>Kirim</button></div></div>}
+      <div className="row"><input className="grow" value={why} onChange={e => setWhy(e.target.value)} placeholder="Posisi hukum" /></div>
+      <CitationPicker value={cites} onChange={setCites} />
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn primary" disabled={busy || !why || !cites.length} onClick={() => run(() => api(`/corpus/changes/${c.id}/legal-answer`, { body: { answer: why, citation_provision_version_ids: cites.map(x => x.id) } }), "Posisi hukum tercatat; perubahan kembali ke Analis untuk dinilai.")}>Kirim</button></div></div>}
+    {/* Checker: Manajer Kepatuhan (titik kendali 1); server menolak bila Manajer juga penilainya */}
     {role === "COMPLIANCE_MANAGER" && c.review_state === "VALIDATED" && <div className="decision"><h4>Konfirmasi materialitas (titik kendali 1)</h4>
       <p className="small" style={{ marginTop: 0 }}>Konfirmasi akan menandai kewajiban dan keputusan keberlakuan yang menyitasi pasal ini menjadi Perlu ditinjau. Tidak ada yang disunting otomatis.</p>
       <div className="row"><input className="grow" value={why} onChange={e => setWhy(e.target.value)} placeholder="Alasan (wajib bila dikembalikan)" />
         <button className="btn primary" disabled={busy} onClick={() => run(() => api(`/corpus/changes/${c.id}/confirm-materiality`, { body: { outcome: "APPROVED", reason: why } }), "Materialitas dikonfirmasi; dampak hilir ditandai.")}>Konfirmasi material</button>
-        <button className="btn danger" disabled={busy || !why} onClick={() => run(() => api(`/corpus/changes/${c.id}/confirm-materiality`, { body: { outcome: "REJECTED", reason: why } }), "Dikembalikan ke analis.")}>Kembalikan</button></div></div>}
-  </li>;
+        <button className="btn danger" disabled={busy || !why} onClick={() => run(() => api(`/corpus/changes/${c.id}/confirm-materiality`, { body: { outcome: "REJECTED", reason: why } }), "Dikembalikan ke penilai.")}>Kembalikan</button></div></div>}
+  </section>;
+}
+
+// Panel kanan: relasi dokumen beserta pasal penetap. Analis mengusulkan; Manajer (bukan pengusul) mengonfirmasi; legal hanya membaca.
+function RelasiPanel({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ctx: Ctx; onChange: () => void }) {
+  const [rels, reload] = useLoad<any[]>(() => api(`/corpus/relationships?document_id=${doc.id}`), [doc.id], ctx.notify);
+  const [rf, setRf] = useState({ target_document_id: "", relation_type: "AMENDS", citing: "" });
+  const [provs, setProvs] = useState<Prov[]>([]);
+  useEffect(() => { const v = published(doc).pop(); if (v) api<Prov[]>(`/corpus/versions/${v.id}/provisions`).then(setProvs).catch(() => setProvs([])); }, [doc.id]);
+  const { run, busy } = useAction(ctx.notify, () => { reload(); onChange(); });
+  const role = ctx.me.role;
+  const proposer = role === "REGULATORY_ANALYST";
+  const confirmer = role === "COMPLIANCE_MANAGER"; // persetujuan relasi = Manajer, dan bukan pengusulnya
+  return <section className="panel"><h2>Relasi dokumen</h2>
+    {proposer && <p className="muted small" style={{ marginTop: 2 }}>Catat bila <b>{doc.canonical_number}</b> mengubah atau mencabut dokumen lain.</p>}
+    {rels?.length ? <ul className="list">{rels.map(r => <li key={r.id} className="between"><span className="small">{r.source} <b>{r.relation_type}</b> {r.target}
+      {r.proposed_by && <span className="muted"> · diusulkan {r.proposed_by}</span>}</span>
+      <span className="row"><Status s={r.state === "PROPOSED" ? "SUBMITTED" : r.state === "CONFIRMED" ? "ACCEPTED" : "REJECTED"} />
+        {confirmer && r.state === "PROPOSED" && r.proposed_by_id !== ctx.me.user_id && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/relationships/${r.id}/confirm`, { method: "POST" }), "Relasi dikonfirmasi; status dokumen target diperbarui.")}>Konfirmasi</button>}</span></li>)}</ul>
+      : <p className="small muted">Belum ada relasi.</p>}
+    {proposer && <div className="form" style={{ marginTop: 8 }}>
+      <label className="field">Dokumen ini…<select value={rf.relation_type} onChange={e => setRf({ ...rf, relation_type: e.target.value })}>{RELATION_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+      <label className="field">Dokumen target<select value={rf.target_document_id} onChange={e => setRf({ ...rf, target_document_id: e.target.value })}><option value="">Pilih</option>{docs.filter(d => d.id !== doc.id).map(d => <option key={d.id} value={d.id}>{d.canonical_number}</option>)}</select></label>
+      <label className="field">Pasal penetap<select value={rf.citing} onChange={e => setRf({ ...rf, citing: e.target.value })}><option value="">Pilih pasal</option>{provs.map(p => <option key={p.provision_version_id} value={p.provision_version_id}>{p.number_label}</option>)}</select></label>
+      <div><button className="btn primary" disabled={busy || !rf.target_document_id || !rf.citing} onClick={() => run(async () => { await api("/corpus/relationships", { body: { source_document_id: doc.id, target_document_id: rf.target_document_id, relation_type: rf.relation_type, citing_provision_version_id: rf.citing } }); setRf({ target_document_id: "", relation_type: "AMENDS", citing: "" }); }, "Relasi diusulkan; menunggu konfirmasi.")}>Usulkan relasi</button></div>
+      <p className="small muted" style={{ margin: 0 }}>Relasi yang mengubah status dokumen (mengubah/mencabut) dikonfirmasi oleh Manajer Kepatuhan.</p>
+    </div>}
+  </section>;
 }
 
 function DocGovernance({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ctx: Ctx; onChange: () => void }) {

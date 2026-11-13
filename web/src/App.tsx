@@ -65,8 +65,8 @@ export default function App() {
   // pesan lama dibersihkan saat pindah halaman; pesan dari aksi yang baru saja memicu navigasi tetap tampil
   useEffect(() => setMsg(m => (m && Date.now() - m.at < 1500 ? m : null)), [route]);
 
-  if (!me || !hasToken()) return <Login onDone={setMe} />;
-  const ctx: Ctx = { me, notify, go, openCite };
+  // Peninjau Hukum langsung diarahkan ke halaman kerjanya (Perubahan regulasi)
+  if (!me || !hasToken()) return <Login onDone={m => { setMe(m); if (m.role === "LEGAL_REVIEWER") go("perubahan"); }} />;  const ctx: Ctx = { me, notify, go, openCite };
   const [page, param] = route.split("/");
   const logout = () => { setToken(""); sessionStorage.removeItem("rcip_me"); setMe(null); };
   const search = (e: FormEvent) => { e.preventDefault(); if (q.trim()) go(`cari/${encodeURIComponent(kind)}/${encodeURIComponent(q.trim())}`); };

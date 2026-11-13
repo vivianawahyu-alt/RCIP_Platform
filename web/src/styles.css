@@ -305,3 +305,9 @@ button.kpi:focus-visible { outline: 2px solid var(--seal); }
 .dropzone { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 16px 18px; }
 .owner-finding { padding: 14px 0; border-top: 1px solid var(--line); }
 .owner-finding:first-of-type { border-top: 0; }
+/* Perubahan regulasi: bilah pembanding versi + kartu perubahan per pasal (role legal & analis) */
+.compare-bar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.change-card { margin-bottom: 16px; }
+.change-card .verbatim { margin-top: 12px; }
+.change-title { font-family: var(--serif); font-size: 18px; }
+@media (max-width: 760px) { .compare-bar { grid-template-columns: 1fr 1fr; } .compare-bar .field:first-child { grid-column: 1 / -1; } }

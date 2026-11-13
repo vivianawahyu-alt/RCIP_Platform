@@ -3,9 +3,11 @@ import { api } from "../api";
 import type { Obligation, User } from "../types";
 import type { Ctx } from "../ui";
 import { AiBadge, Cite, Empty, Flow, PageHead, Status, can, useAction, useLoad } from "../ui";
+import { CitationPicker } from "../CitationPicker";
+import type { Cite as Cited } from "../CitationPicker";
 
 const STEPS: [string, string][] = [["AI_DRAFT", "Draf AI"], ["IN_VALIDATION", "Validasi"], ["PENDING_APPROVAL", "Persetujuan"], ["ACTIVE", "Aktif"]];
-const FILTERS = ["Semua", "AI_DRAFT", "PENDING_APPROVAL", "ACTIVE", "REVIEW_REQUIRED"];
+const FILTERS = ["Semua", "AI_DRAFT", "PENDING_LEGAL", "PENDING_APPROVAL", "ACTIVE", "REVIEW_REQUIRED"];
 
 export function Kewajiban({ ctx }: { ctx: Ctx }) {
   const [obs, reload] = useLoad<Obligation[]>(() => api("/compliance/obligations"), [], ctx.notify);
@@ -16,9 +18,13 @@ export function Kewajiban({ ctx }: { ctx: Ctx }) {
   const [ack, setAck] = useState<Record<string, boolean>>({});
   const [why, setWhy] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState("Semua");
+  const [q, setQ] = useState<Record<string, string>>({});
+  const [lw, setLw] = useState<Record<string, string>>({});
+  const [cites, setCites] = useState<Record<string, Cited[]>>({});
   const [trace, setTrace] = useState<any>(null);
   const { run, busy } = useAction(ctx.notify, reload);
   const officer = can(ctx.me.role, "obligation_validate"), manager = can(ctx.me.role, "obligation_approve");
+  const legal = ctx.me.role === "LEGAL_REVIEWER";
   const owners = (users || []).filter(u => !["SYSTEM_ADMINISTRATOR", "INTERNAL_AUDITOR", "EXECUTIVE"].includes(u.role));
   const defOwner = owners.find(u => u.username === "owner")?.id || "";
   const shown = (obs || []).filter(o => filter === "Semua" || o.state === filter);
@@ -37,6 +43,7 @@ export function Kewajiban({ ctx }: { ctx: Ctx }) {
       {o.low_confidence && ["AI_DRAFT", "IN_VALIDATION"].includes(o.state) && <span className="badge amber">Keyakinan rendah · wajib ditinjau manual</span>}
       {o.state === "REVIEW_REQUIRED" && <div className="notice error" style={{ marginTop: 8 }}><span>Pasal sumber berubah secara material. Kewajiban tetap tercatat sampai ditinjau ulang; buka kembali untuk memvalidasi terhadap versi terbaru.</span></div>}
       {o.reopen_reason && o.state !== "ACTIVE" && <p className="small">Dibuka kembali: {o.reopen_reason}</p>}
+      {o.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {o.legal_question}{o.legal_answer && <><br />Posisi hukum{o.legal_reviewer ? ` (${o.legal_reviewer})` : ""}: {o.legal_answer}</>}</p>}
       <div className="row small muted">{o.deadline && <span>Tenggat: {o.deadline}</span>}{o.frequency && <span>Frekuensi: {o.frequency}</span>}
         <span>Pemilik: {o.owner || "belum ditetapkan"}</span>{o.validator && <span>Validator: {o.validator}</span>}{o.approver && <span>Penyetuju: {o.approver}</span>}</div>
 
@@ -49,6 +56,16 @@ export function Kewajiban({ ctx }: { ctx: Ctx }) {
           <div><button className="btn primary" onClick={() => run(() => api(`/compliance/obligations/${o.id}/validate`, { body: { owner_id: owner[o.id] ?? defOwner, plain_language_summary: summary[o.id] || undefined, low_confidence_reviewed: !!ack[o.id] } }), "Kewajiban divalidasi dan diajukan ke Manajer Kepatuhan.")} disabled={busy || (o.low_confidence && !ack[o.id])}>Validasi & ajukan persetujuan</button></div>
         </div>
       </div>}
+      {officer && ["AI_DRAFT", "IN_VALIDATION"].includes(o.state) && <div className="decision">
+        <h4>Penafsiran diperdebatkan?</h4>
+        <div className="row"><input className="grow" value={q[o.id] || ""} onChange={e => setQ({ ...q, [o.id]: e.target.value })} placeholder="Tulis pertanyaan hukum untuk Peninjau Hukum" />
+          <button className="btn" disabled={busy || !(q[o.id] || "").trim()} onClick={() => run(() => api(`/compliance/obligations/${o.id}/escalate`, { body: { question: q[o.id] } }), "Diteruskan ke Peninjau Hukum.")}>Eskalasi</button></div>
+      </div>}
+      {legal && o.state === "PENDING_LEGAL" && <div className="decision"><h4>Posisi hukum</h4>
+        <div className="row"><input className="grow" value={lw[o.id] || ""} onChange={e => setLw({ ...lw, [o.id]: e.target.value })} placeholder="Posisi hukum" /></div>
+        <CitationPicker value={cites[o.id] || []} onChange={v => setCites({ ...cites, [o.id]: v })} />
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn primary" disabled={busy || !(lw[o.id] || "").trim() || !(cites[o.id] || []).length} onClick={() => run(() => api(`/compliance/obligations/${o.id}/legal-answer`, { body: { answer: lw[o.id], citation_provision_version_ids: (cites[o.id] || []).map(x => x.id) } }), "Posisi hukum tercatat; kewajiban kembali ke Pejabat Kepatuhan untuk divalidasi.")}>Kirim</button></div></div>}
       {manager && o.state === "PENDING_APPROVAL" && <div className="decision">
         <h4>Keputusan persetujuan (titik kendali 3)</h4>
         <p className="small muted" style={{ marginTop: 0 }}>Anda tidak dapat menyetujui kewajiban yang Anda validasi sendiri.</p>
@@ -120,6 +137,6 @@ function ReopenBox({ o, ctx, onDone }: { o: Obligation; ctx: Ctx; onDone: () => 
     <div className="form">
       <label className="field">Alasan<input value={reason} onChange={e => setReason(e.target.value)} placeholder="mis. tenggat berubah 24 → 12 jam" /></label>
       <div className="row">{target ? <span className="small">Sitasi akan diarahkan ke <b>{target.label}</b></span> : <button className="btn sm" onClick={() => find().catch(e => ctx.notify("error", e.message))}>Cari pasal yang sama di versi terbaru</button>}</div>
-      <div><button className="btn primary" disabled={busy || !reason} onClick={() => run(() => api(`/compliance/obligations/${o.id}/reopen`, { body: { reason, new_provision_version_id: target?.id } }), "Kewajiban dibuka kembali untuk divalidasi ulang.")}>Buka kembali untuk validasi</button></div>
+      <div><button className="btn primary" disabled={busy || !reason} onClick={() => run(() => api(`/compliance/obligations/${o.id}/reopen`, { body: { reason, new_provision_version_id: target?.id } }), "Kewajiban dibuka kembali untuk validasi ulang.")}>Buka kembali untuk validasi</button></div>
     </div></div>;
 }

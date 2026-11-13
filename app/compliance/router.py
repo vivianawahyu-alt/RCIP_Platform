@@ -17,7 +17,7 @@ from app.platform.permissions import allows, ensure_owner, own_only, require
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import ResponseWrapper
-from app.compliance.common import iso, now, sid, user_names
+from app.compliance.common import iso, now, require_citations, require_text, sid, user_names
 from app.platform.config_service import get_value, window_days
 from app.shared.vocabularies import (AppRole, ApplicabilityValue, AssessmentState,
                                      ControlPoint, ControlResult, DesignResult, EvidenceState, FindingSource,
@@ -65,6 +65,13 @@ class DecisionIn(BaseModel):
     outcome: str  # APPROVED | REJECTED
     reason: Optional[str] = None
 
+class EscalateIn(BaseModel):
+    question: str
+
+
+class LegalAnswerIn(BaseModel):
+    answer: str
+    citation_provision_version_ids: list[str] = []  # wajib >= 1 (FRD Eksibit 33; TRD guard legal_position_cited)
 
 class RiskIn(BaseModel):
     obligation_id: str
@@ -160,6 +167,7 @@ def list_obligations(db: Session = Depends(get_db), user: AppUser = Depends(requ
         "approver": names.get(sid(o.approver_id)), "frequency": o.frequency, "original_text": o.original_text,
         "created_at": iso(o.created_at), "supporting_phrases": o.supporting_phrases or [], "model_id": o.model_id,
         "low_confidence": o.low_confidence, "reopen_reason": o.reopen_reason,
+        "legal_question": o.legal_question, "legal_answer": o.legal_answer, "legal_reviewer": names.get(sid(o.legal_reviewer_id)),
         "required_actions": o.required_actions or [], "required_evidence": o.required_evidence,
         "ai": _ai_meta(db, o.ai_call_id),
         "citation": {"provision_version_id": str(o.primary_citation_id), "canonical_number": d.canonical_number,
@@ -203,7 +211,8 @@ def reopen_obligation(ob_id: str, body: ReopenIn, db: Session = Depends(get_db),
 
 @router.post("/obligations/{ob_id}/validate", response_model=ResponseWrapper[dict])
 def validate(ob_id: str, body: ValidateIn, db: Session = Depends(get_db),
-             user: AppUser = Depends(require("obligation", "U"))):  # validasi rekaman terstruktur: U = Pejabat, Peninjau Hukum
+             user: AppUser = Depends(require("obligation", "U", only=[AppRole.COMPLIANCE_OFFICER]))):
+    # TRD §7.6: IN_VALIDATION → PENDING_APPROVAL diajukan Pejabat Kepatuhan. Peninjau Hukum memakai U lewat legal-answer.   
     ob = _get(db, Obligation, ob_id)
     if ob.state not in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value):
         raise AppError(409, "INVALID_STATE", f"Kewajiban berstatus {ob.state}")
@@ -221,6 +230,44 @@ def validate(ob_id: str, body: ValidateIn, db: Session = Depends(get_db),
     db.commit()
     return ResponseWrapper(data={"id": str(ob.id), "state": ob.state})
 
+@router.post("/obligations/{ob_id}/escalate", response_model=ResponseWrapper[dict])
+def escalate_obligation(ob_id: str, body: EscalateIn, db: Session = Depends(get_db),
+                        user: AppUser = Depends(require("obligation", "U", only=[AppRole.COMPLIANCE_OFFICER]))):
+    """W8 (FRD Eksibit 33; TRD AOM.ESCALATED_TO_LEGAL): IN_VALIDATION → PENDING_LEGAL oleh Pejabat Kepatuhan, pertanyaan wajib.
+    Draf AI yang belum dibuka lebih dulu dicatat AI_DRAFT → IN_VALIDATION (OBLIGATION_VALIDATION_STARTED)."""
+    ob = _get(db, Obligation, ob_id)
+    if ob.state not in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value):
+        raise AppError(409, "INVALID_STATE", f"Kewajiban berstatus {ob.state}; eskalasi hanya dari validasi")
+    question = require_text(body.question, "question")
+    if ob.state == ObligationState.AI_DRAFT.value:
+        audit(db, user.id, "OBLIGATION_VALIDATION_STARTED", "obligation", ob.id, before={"state": ob.state},
+              after={"state": ObligationState.IN_VALIDATION.value})
+        ob.state = ObligationState.IN_VALIDATION.value
+    before = {"state": ob.state}
+    ob.legal_question, ob.legal_answer, ob.legal_reviewer_id = question, None, None
+    ob.state = ObligationState.PENDING_LEGAL.value
+    audit(db, user.id, "OBLIGATION_ESCALATED_TO_LEGAL", "obligation", ob.id, before=before,
+          after={"state": ob.state, "question": question})
+    db.commit()
+    return ResponseWrapper(data={"id": str(ob.id), "state": ob.state})
+
+@router.post("/obligations/{ob_id}/legal-answer", response_model=ResponseWrapper[dict])
+def legal_answer_obligation(ob_id: str, body: LegalAnswerIn, db: Session = Depends(get_db),
+                            user: AppUser = Depends(require("obligation", "U", only=[AppRole.LEGAL_REVIEWER]))):
+    """W8 (FRD Eksibit 33; TRD AOM.LEGAL_POSITION_RECORDED): PENDING_LEGAL → IN_VALIDATION oleh Peninjau Hukum.
+    Guard legal_position_cited: posisi hukum wajib menyitasi ketentuan terbit yang teresolusi (TRD Eksibit 25)."""
+    ob = _get(db, Obligation, ob_id)
+    if ob.state != ObligationState.PENDING_LEGAL.value:
+        raise AppError(409, "INVALID_STATE", f"Kewajiban berstatus {ob.state}, bukan PENDING_LEGAL")
+    answer = require_text(body.answer, "answer")
+    labels = require_citations(db, body.citation_provision_version_ids)
+    before = {"state": ob.state}
+    ob.legal_answer, ob.legal_reviewer_id = f"{answer}\n\nSitasi: {'; '.join(labels)}", user.id
+    ob.state = ObligationState.IN_VALIDATION.value
+    audit(db, user.id, "LEGAL_POSITION_RECORDED", "obligation", ob.id, before=before,
+          after={"state": ob.state, "answer": answer, "citation_provision_version_ids": body.citation_provision_version_ids})
+    db.commit()
+    return ResponseWrapper(data={"id": str(ob.id), "state": ob.state})
 
 @router.post("/obligations/{ob_id}/decision", response_model=ResponseWrapper[dict])
 def decide(ob_id: str, body: DecisionIn, db: Session = Depends(get_db),
@@ -337,7 +384,7 @@ def control_detail(control_id: str, db: Session = Depends(get_db), user: AppUser
 @router.post("/risks", response_model=ResponseWrapper[dict])
 def create_risk(body: RiskIn, db: Session = Depends(get_db), user: AppUser = Depends(require("risk", "C"))):
     ob = _get(db, Obligation, body.obligation_id)
-    if ob.state in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value):
+    if ob.state in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value, ObligationState.PENDING_LEGAL.value):        
         raise AppError(409, "AI_DRAFT_BLOCKED", "Risiko tidak dapat ditautkan ke kewajiban yang belum divalidasi")
     if body.severity not in {s.value for s in Severity}:
         raise AppError(422, "BAD_SEVERITY", "severity harus CRITICAL, HIGH, MEDIUM, atau LOW")
@@ -380,7 +427,7 @@ def set_control_owner(control_id: str, body: ControlOwnerIn, db: Session = Depen
 def map_control(ob_id: str, control_id: str, db: Session = Depends(get_db),
                 user: AppUser = Depends(require("control_library", "U"))):
     ob, ctl = _get(db, Obligation, ob_id), _get(db, Control, control_id)
-    if ob.state in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value):
+    if ob.state in (ObligationState.AI_DRAFT.value, ObligationState.IN_VALIDATION.value, ObligationState.PENDING_LEGAL.value):        
         raise AppError(409, "AI_DRAFT_BLOCKED", "Kewajiban belum divalidasi manusia; pemetaan kontrol diblokir")
     if db.get(ObligationControlMap, (ob.id, ctl.id)):
         raise AppError(409, "MAPPING_EXISTS", "Kontrol sudah dipetakan ke kewajiban ini")

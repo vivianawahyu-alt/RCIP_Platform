@@ -77,7 +77,9 @@ class Obligation(Base):
     low_confidence = Column(Boolean, nullable=False, default=False)
     low_confidence_reviewed_by = Column(U(), ForeignKey("platform.app_user.id"))
     reopen_reason = Column(Text)
-
+    legal_question = Column(Text)   # FRD Eksibit 33: pertanyaan eskalasi (wajib)
+    legal_answer = Column(Text)     # posisi hukum beserta sitasi (wajib)
+    legal_reviewer_id = Column(U(), ForeignKey("platform.app_user.id"))
 
 class Risk(Base):
     __tablename__ = "risk"
