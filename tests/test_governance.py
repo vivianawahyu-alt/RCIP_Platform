@@ -195,21 +195,54 @@ def test_legal_reviewer_advisory_only(client):
 
 
 def test_relationship_confirmed_by_manager_not_legal(client):
-    """FRD §4.2 (Relasi regulasi: Peninjau Hukum RU, Manajer RA) & FR-RKM-009: legal boleh menyunting usulan,
-    tetapi hanya Manajer yang mengonfirmasi; Analis tidak dapat mengonfirmasi."""
+    """Arahan mentor: Peninjau Hukum hanya melihat, memberi catatan hukum, dan minta revisi (tidak mengubah relasi).
+    Analis mengajukan → Manajer setujui/tolak → status dokumen otomatis berubah; Analis tidak dapat menyetujui."""
     a, m, legal = login(client, "analyst"), login(client, "manager"), login(client, "legal")
     d1, (v1, _) = _doc_with_two_versions(client, "Pasal 1\nBank wajib A.", "Pasal 1\nBank wajib A.")
     d2, _ = _doc_with_two_versions(client, "Pasal 1\nBank wajib B.", "Pasal 1\nBank wajib B.")
     pv = client.get(f"{P}/corpus/versions/{v1}/provisions", headers=a).json()["data"][0]["provision_version_id"]
     rel = client.post(f"{P}/corpus/relationships", headers=a, json={"source_document_id": d2, "target_document_id": d1,
-                      "relation_type": "AMENDS", "citing_provision_version_id": pv}).json()["data"]["id"]
-    # Peninjau Hukum: U (memberi catatan posisi pada usulan relasi), bukan A
-    assert client.patch(f"{P}/corpus/relationships/{rel}", headers=legal,
-                        json={"note": "Pasal penutup menegaskan perubahan, bukan pencabutan"}).status_code == 200
-    assert client.post(f"{P}/corpus/relationships/{rel}/confirm", headers=legal).status_code == 403
-    assert client.post(f"{P}/corpus/relationships/{rel}/confirm", headers=a).status_code == 403
-    assert client.post(f"{P}/corpus/relationships/{rel}/confirm", headers=m).json()["data"]["state"] == "CONFIRMED"
+                      "relation_type": "REVOKES", "citing_provision_version_id": pv}).json()["data"]["id"]
+    url = f"{P}/corpus/relationships/{rel}"
+    row = lambda: next(x for x in client.get(f"{P}/corpus/relationships?document_id={d1}", headers=a).json()["data"] if x["id"] == rel)
+    # Peninjau Hukum tidak dapat mengubah relasi, tetapi dapat memberi catatan hukum
+    assert client.patch(url, headers=legal, json={"note": "ubah"}).status_code == 403
+    assert client.post(f"{url}/legal-note", headers=a, json={"note": "x"}).status_code == 403
+    assert client.post(f"{url}/legal-note", headers=legal, json={"note": ""}).status_code == 422
+    assert client.post(f"{url}/legal-note", headers=legal, json={"note": "Cek pasal penutup"}).json()["data"]["state"] == "PROPOSED"
+    assert row()["legal_note"] == "Cek pasal penutup" and row()["legal_reviewer"] == "legal"
+    # minta revisi: Manajer harus menunggu Analis
+    assert client.post(f"{url}/request-revision", headers=legal,
+                       json={"note": "Pasal penutup hanya mengubah, bukan mencabut"}).json()["data"]["state"] == "REVISION_REQUESTED"
+    r = client.post(f"{url}/confirm", headers=m)
+    assert r.status_code == 409 and r.json()["error_code"] == "REVISION_PENDING"
+    assert client.post(f"{url}/reject", headers=m, json={"reason": "x"}).json()["error_code"] == "REVISION_PENDING"
+    # Analis merevisi lalu mengajukan ulang
+    assert client.post(f"{url}/resubmit", headers=legal, json={"relation_type": "AMENDS"}).status_code == 403
+    assert client.post(f"{url}/resubmit", headers=a, json={"relation_type": "AMENDS"}).json()["data"]["state"] == "PROPOSED"
+    # hanya Manajer (bukan pengusul) yang menyetujui; status dokumen berubah otomatis
+    assert client.post(f"{url}/confirm", headers=legal).status_code == 403
+    assert client.post(f"{url}/confirm", headers=a).status_code == 403
+    assert client.post(f"{url}/confirm", headers=m).json()["data"]["state"] == "CONFIRMED"
+    doc = next(d for d in client.get(f"{P}/corpus/documents", headers=a).json()["data"] if d["id"] == d1)
+    assert doc["status"] == "AMENDED"
 
+
+def test_relationship_rejected_by_manager(client):
+    """Manajer menolak dengan alasan wajib; status dokumen target tidak berubah."""
+    a, m = login(client, "analyst"), login(client, "manager")
+    d1, (v1, _) = _doc_with_two_versions(client, "Pasal 1\nBank wajib A.", "Pasal 1\nBank wajib A.")
+    d2, _ = _doc_with_two_versions(client, "Pasal 1\nBank wajib B.", "Pasal 1\nBank wajib B.")
+    pv = client.get(f"{P}/corpus/versions/{v1}/provisions", headers=a).json()["data"][0]["provision_version_id"]
+    rel = client.post(f"{P}/corpus/relationships", headers=a, json={"source_document_id": d2, "target_document_id": d1,
+                      "relation_type": "REVOKES", "citing_provision_version_id": pv}).json()["data"]["id"]
+    url = f"{P}/corpus/relationships/{rel}"
+    assert client.post(f"{url}/reject", headers=a, json={"reason": "x"}).status_code == 403
+    assert client.post(f"{url}/reject", headers=m, json={"reason": ""}).status_code == 422
+    assert client.post(f"{url}/reject", headers=m, json={"reason": "Bukan pencabutan"}).json()["data"]["state"] == "REJECTED"
+    assert client.post(f"{url}/confirm", headers=m).status_code == 409
+    doc = next(d for d in client.get(f"{P}/corpus/documents", headers=a).json()["data"] if d["id"] == d1)
+    assert doc["status"] != "REVOKED"
 
 def test_legal_cannot_validate_obligation(client):
     """TRD §7.6: IN_VALIDATION → PENDING_APPROVAL hanya diajukan Pejabat Kepatuhan; Peninjau Hukum hanya memberi posisi."""
@@ -259,6 +292,12 @@ def test_obligation_escalation_to_legal(client):
     assert client.post(ans, headers=legal, json={"answer": "Near-miss tidak termasuk",
                        "citation_provision_version_ids": [pv1]}).json()["data"]["state"] == "IN_VALIDATION"
     assert "Sitasi:" in row()["legal_answer"] and row()["legal_reviewer"] == "legal"
+        # posisi hukum tersimpan di tabel sendiri; kewajiban menyimpan id + versinya
+    assert row()["legal_position_id"] and row()["legal_position_version"] == 1
+    # eskalasi kedua → posisi hukum versi 2 (versi lama tetap tersimpan)
+    client.post(esc, headers=o, json={"question": "Bagaimana dengan insiden pihak ketiga?"})
+    client.post(ans, headers=legal, json={"answer": "Termasuk", "citation_provision_version_ids": [pv1]})
+    assert row()["legal_position_version"] == 2 and row()["legal_answer"].startswith("Termasuk")
 
     # alur normal berlanjut: validasi → persetujuan Manajer
     assert client.post(f"{P}/compliance/obligations/{ob}/validate", headers=o, json={"owner_id": owner, "low_confidence_reviewed": True}).json()["data"]["state"] == "PENDING_APPROVAL"

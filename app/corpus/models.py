@@ -123,7 +123,8 @@ class Change(Base):
     analyst_material = Column(Boolean)
     review_reason = Column(Text)
     legal_question = Column(Text)
-    legal_answer = Column(Text)
+    legal_position_id = Column(UUID(as_uuid=True), ForeignKey("compliance.legal_position.id"))   # posisi hukum
+    legal_position_version = Column(Integer)                                                    # versi yang dipakai    
     validated_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
     validated_at = Column(DateTime(timezone=True))
     confirmed_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
@@ -145,7 +146,10 @@ class Relationship(Base):
     proposed_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
     confirmed_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
+    legal_note = Column(Text)                                                        # catatan hukum Peninjau Hukum
+    legal_reviewer_id = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
+    reject_reason = Column(Text)                                                     # alasan penolakan Manajer
+    rejected_by = Column(UUID(as_uuid=True), ForeignKey("platform.app_user.id"))
 
 class TaxonomyLabel(Base):
     __tablename__ = "taxonomy_label"

@@ -42,7 +42,7 @@ const STATE_LABEL: Record<string, [string, string]> = {
   SUBMITTED: ["Menunggu tinjauan", "amber"], ACCEPTED: ["Diterima", "green"], REJECTED: ["Ditolak", "red"], EXPIRED: ["Kedaluwarsa", ""],
   CONCLUDED: ["Disimpulkan", "amber"], PENDING_SIGNOFF: ["Menunggu sign-off", "blue"], SIGNED_OFF: ["Sign-off", "green"],
   DRAFT: ["Draf", "amber"], ISSUED: ["Terbit", "green"], WITHDRAWN: ["Ditarik", "red"],
-  PUBLISHED: ["Terbit", "green"], SEGMENTED_DRAFT: ["Draf segmentasi", "amber"], UNDER_CORRECTION: ["Dikoreksi", "amber"], IN_FORCE: ["Berlaku", "green"],
+  PUBLISHED: ["Terbit", "green"], AMENDED: ["Diubah", "amber"], REVOKED: ["Dicabut", "red"], PARTIALLY_REVOKED: ["Dicabut sebagian", "amber"], SEGMENTED_DRAFT: ["Draf segmentasi", "amber"], UNDER_CORRECTION: ["Dikoreksi", "amber"], IN_FORCE: ["Berlaku", "green"],
   EFFECTIVE: ["Efektif", "green"], PARTIALLY_EFFECTIVE: ["Sebagian efektif", "amber"], INEFFECTIVE: ["Tidak efektif", "red"],
   NOT_ASSESSED: ["Belum diasesmen", ""], NOT_TESTED: ["Belum diuji", ""], NOT_APPLICABLE: ["Tidak berlaku", ""],
 };

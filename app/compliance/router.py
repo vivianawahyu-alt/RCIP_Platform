@@ -17,7 +17,8 @@ from app.platform.permissions import allows, ensure_owner, own_only, require
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import ResponseWrapper
-from app.compliance.common import iso, now, require_citations, require_text, sid, user_names
+from app.compliance.common import iso, now, require_text, sid, user_names
+from app.compliance.legal_position import legal_position_view, record_legal_position
 from app.platform.config_service import get_value, window_days
 from app.shared.vocabularies import (AppRole, ApplicabilityValue, AssessmentState,
                                      ControlPoint, ControlResult, DesignResult, EvidenceState, FindingSource,
@@ -167,7 +168,7 @@ def list_obligations(db: Session = Depends(get_db), user: AppUser = Depends(requ
         "approver": names.get(sid(o.approver_id)), "frequency": o.frequency, "original_text": o.original_text,
         "created_at": iso(o.created_at), "supporting_phrases": o.supporting_phrases or [], "model_id": o.model_id,
         "low_confidence": o.low_confidence, "reopen_reason": o.reopen_reason,
-        "legal_question": o.legal_question, "legal_answer": o.legal_answer, "legal_reviewer": names.get(sid(o.legal_reviewer_id)),
+        "legal_question": o.legal_question, **legal_position_view(db, o.legal_position_id, names),        
         "required_actions": o.required_actions or [], "required_evidence": o.required_evidence,
         "ai": _ai_meta(db, o.ai_call_id),
         "citation": {"provision_version_id": str(o.primary_citation_id), "canonical_number": d.canonical_number,
@@ -244,7 +245,7 @@ def escalate_obligation(ob_id: str, body: EscalateIn, db: Session = Depends(get_
               after={"state": ObligationState.IN_VALIDATION.value})
         ob.state = ObligationState.IN_VALIDATION.value
     before = {"state": ob.state}
-    ob.legal_question, ob.legal_answer, ob.legal_reviewer_id = question, None, None
+    ob.legal_question, ob.legal_position_id, ob.legal_position_version = question, None, None    
     ob.state = ObligationState.PENDING_LEGAL.value
     audit(db, user.id, "OBLIGATION_ESCALATED_TO_LEGAL", "obligation", ob.id, before=before,
           after={"state": ob.state, "question": question})
@@ -259,13 +260,12 @@ def legal_answer_obligation(ob_id: str, body: LegalAnswerIn, db: Session = Depen
     ob = _get(db, Obligation, ob_id)
     if ob.state != ObligationState.PENDING_LEGAL.value:
         raise AppError(409, "INVALID_STATE", f"Kewajiban berstatus {ob.state}, bukan PENDING_LEGAL")
-    answer = require_text(body.answer, "answer")
-    labels = require_citations(db, body.citation_provision_version_ids)
     before = {"state": ob.state}
-    ob.legal_answer, ob.legal_reviewer_id = f"{answer}\n\nSitasi: {'; '.join(labels)}", user.id
+    lp = record_legal_position(db, ob, "OBLIGATION", body.answer, body.citation_provision_version_ids, user.id)
     ob.state = ObligationState.IN_VALIDATION.value
     audit(db, user.id, "LEGAL_POSITION_RECORDED", "obligation", ob.id, before=before,
-          after={"state": ob.state, "answer": answer, "citation_provision_version_ids": body.citation_provision_version_ids})
+          after={"state": ob.state, "legal_position_id": str(lp.id), "legal_position_version": lp.version,
+                 "citation_provision_version_ids": body.citation_provision_version_ids})    
     db.commit()
     return ResponseWrapper(data={"id": str(ob.id), "state": ob.state})
 

@@ -12,8 +12,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names 
-from app.compliance.common import get_or_404, iso, now, require_citations, require_text, sid, user_names
+from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names
+from app.compliance.legal_position import legal_position_view, record_legal_position
 from app.compliance.models import ApplicabilityDecision, OrganisationProfile
 from app.corpus.models import Document, DocumentVersion, ProvisionVersion, Provision, TaxonomyLabel
 from app.platform.governance import audit, record_approval
@@ -127,8 +127,8 @@ def decision_dto(db: Session, d: ApplicabilityDecision, names: dict) -> dict:
             "citations": cites, "scope_provision_version_ids": d.scope_provision_version_ids or [],
             "relied_upon_attributes": d.relied_upon_attributes, "maker": names.get(sid(d.maker_id)),
             "maker_id": sid(d.maker_id), "approver": names.get(sid(d.approver_id)),
-            "legal_question": d.legal_question, "legal_answer": d.legal_answer,
-            "legal_reviewer": names.get(sid(d.legal_reviewer_id)), "return_reason": d.return_reason,
+            "legal_question": d.legal_question, **legal_position_view(db, d.legal_position_id, names),
+            "return_reason": d.return_reason,
             "review_owner": names.get(sid(d.review_owner_id)), "review_target_date": iso(d.review_target_date),
             "created_at": iso(d.created_at), "submitted_at": iso(d.submitted_at), "decided_at": iso(d.decided_at),
             "superseded_by": sid(d.superseded_by)}
@@ -248,11 +248,11 @@ def escalate(did: str, body: QuestionIn, db: Session = Depends(get_db), user: Ap
 @router.post("/applicability/{did}/legal-answer", response_model=ResponseWrapper[dict])
 def legal_answer(did: str, body: AnswerIn, db: Session = Depends(get_db), user: AppUser = Depends(LEGAL)):
     d = _decision(db, did, {"PENDING_LEGAL"})
-    answer = require_text(body.answer, "answer")
-    labels = require_citations(db, body.citation_provision_version_ids)
-    d.legal_answer, d.legal_reviewer_id, d.state = f"{answer}\n\nSitasi: {'; '.join(labels)}", user.id, "IN_ASSESSMENT"
+    lp = record_legal_position(db, d, "APPLICABILITY", body.answer, body.citation_provision_version_ids, user.id)
+    d.state = "IN_ASSESSMENT"
     audit(db, user.id, "APPLICABILITY_LEGAL_POSITION", "applicability_decision", d.id,
-          after={"answer": answer, "citation_provision_version_ids": body.citation_provision_version_ids})
+          after={"legal_position_id": str(lp.id), "legal_position_version": lp.version,
+                 "citation_provision_version_ids": body.citation_provision_version_ids})
     db.commit()
     return ResponseWrapper(data={"id": str(d.id), "state": d.state})
 
