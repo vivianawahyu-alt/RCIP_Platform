@@ -445,6 +445,50 @@ function ChangeItem({ c, ctx, onDone }: { c: any; ctx: Ctx; onDone: () => void }
   </section>;
 }
 
+// Status relasi (arahan mentor): Analis ajukan → (Peninjau Hukum boleh minta revisi) → Manajer setujui/tolak
+const REL_STATE: Record<string, [string, string]> = {
+  PROPOSED: ["Menunggu persetujuan Manajer", "amber"], REVISION_REQUESTED: ["Analis sedang melakukan revisi", "amber"],
+  CONFIRMED: ["Disetujui", "green"], REJECTED: ["Ditolak", "red"],
+};
+
+function RelasiItem({ r, provs, ctx, onDone }: { r: any; provs: Prov[]; ctx: Ctx; onDone: () => void }) {
+  const { run, busy } = useAction(ctx.notify, onDone);
+  const [text, setText] = useState("");                                         // catatan hukum / alasan tolak
+  const [rev, setRev] = useState({ relation_type: r.relation_type, citing: r.citing_provision_version_id || "" });
+  const role = ctx.me.role;
+  const legal = role === "LEGAL_REVIEWER", analyst = role === "REGULATORY_ANALYST";
+  const manager = role === "COMPLIANCE_MANAGER" && r.proposed_by_id !== ctx.me.user_id;  // pengusul tidak boleh menyetujui
+  const [label, tone] = REL_STATE[r.state] || [r.state, ""];
+  const url = `/corpus/relationships/${r.id}`;
+  return <li>
+    <div className="between"><span className="small">{r.source} <b>{r.relation_type}</b> {r.target}
+      {r.proposed_by && <span className="muted"> · diusulkan {r.proposed_by}</span>}</span>
+      <span className={`badge ${tone}`} title={r.state}>{label}</span></div>
+    {r.legal_note && <p className="small" style={{ margin: "4px 0" }}>Catatan hukum ({r.legal_reviewer}): {r.legal_note}</p>}
+    {r.reject_reason && <p className="small" style={{ margin: "4px 0" }}>Alasan ditolak ({r.rejected_by}): {r.reject_reason}</p>}
+
+    {legal && r.state === "PROPOSED" && <div className="form" style={{ marginTop: 6 }}>
+      <label className="field">Catatan hukum<textarea rows={2} value={text} onChange={e => setText(e.target.value)} /></label>
+      <div className="row">
+        <button className="btn sm" disabled={busy || !text.trim()} onClick={() => run(() => api(`${url}/legal-note`, { body: { note: text } }), "Catatan hukum disimpan.")}>Simpan catatan</button>
+        <button className="btn sm" disabled={busy || !text.trim()} onClick={() => run(() => api(`${url}/request-revision`, { body: { note: text } }), "Revisi diminta; menunggu Analis.")}>Minta revisi</button>
+      </div></div>}
+
+    {analyst && r.state === "REVISION_REQUESTED" && <div className="form" style={{ marginTop: 6 }}>
+      <div className="form-2"><label className="field">Jenis relasi<select value={rev.relation_type} onChange={e => setRev({ ...rev, relation_type: e.target.value })}>{RELATION_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+        <label className="field">Pasal penetap<select value={rev.citing} onChange={e => setRev({ ...rev, citing: e.target.value })}><option value="">Pilih pasal</option>{provs.map(p => <option key={p.provision_version_id} value={p.provision_version_id}>{p.number_label}</option>)}</select></label></div>
+      <div><button className="btn sm primary" disabled={busy || !rev.citing} onClick={() => run(() => api(`${url}/resubmit`, { body: { relation_type: rev.relation_type, citing_provision_version_id: rev.citing } }), "Relasi diajukan ulang ke Manajer.")}>Ajukan ulang</button></div></div>}
+
+    {role === "COMPLIANCE_MANAGER" && r.state === "REVISION_REQUESTED" && <p className="small muted" style={{ margin: "4px 0" }}>Analis sedang melakukan revisi. Persetujuan dapat diberikan setelah relasi diajukan ulang.</p>}
+    {manager && r.state === "PROPOSED" && <div className="form" style={{ marginTop: 6 }}>
+      <label className="field">Alasan (wajib bila menolak)<input value={text} onChange={e => setText(e.target.value)} /></label>
+      <div className="row">
+        <button className="btn sm primary" disabled={busy} onClick={() => run(() => api(`${url}/confirm`, { method: "POST" }), "Relasi disetujui; status dokumen target diperbarui.")}>Setujui</button>
+        <button className="btn sm" disabled={busy || !text.trim()} onClick={() => run(() => api(`${url}/reject`, { body: { reason: text } }), "Relasi ditolak.")}>Tolak</button>
+      </div></div>}
+  </li>;
+}
+
 // Panel kanan: relasi dokumen beserta pasal penetap. Analis mengusulkan; Manajer (bukan pengusul) mengonfirmasi; legal hanya membaca.
 function RelasiPanel({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ctx: Ctx; onChange: () => void }) {
   const [rels, reload] = useLoad<any[]>(() => api(`/corpus/relationships?document_id=${doc.id}`), [doc.id], ctx.notify);
@@ -454,21 +498,17 @@ function RelasiPanel({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ctx:
   const { run, busy } = useAction(ctx.notify, () => { reload(); onChange(); });
   const role = ctx.me.role;
   const proposer = role === "REGULATORY_ANALYST";
-  const confirmer = role === "COMPLIANCE_MANAGER"; // persetujuan relasi = Manajer, dan bukan pengusulnya
   return <section className="panel"><h2>Relasi dokumen</h2>
     {proposer && <p className="muted small" style={{ marginTop: 2 }}>Catat bila <b>{doc.canonical_number}</b> mengubah atau mencabut dokumen lain.</p>}
-    {rels?.length ? <ul className="list">{rels.map(r => <li key={r.id} className="between"><span className="small">{r.source} <b>{r.relation_type}</b> {r.target}
-      {r.proposed_by && <span className="muted"> · diusulkan {r.proposed_by}</span>}</span>
-      <span className="row"><Status s={r.state === "PROPOSED" ? "SUBMITTED" : r.state === "CONFIRMED" ? "ACCEPTED" : "REJECTED"} />
-        {confirmer && r.state === "PROPOSED" && r.proposed_by_id !== ctx.me.user_id && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/relationships/${r.id}/confirm`, { method: "POST" }), "Relasi dikonfirmasi; status dokumen target diperbarui.")}>Konfirmasi</button>}</span></li>)}</ul>
+    {rels?.length ? <ul className="list">{rels.map(r => <RelasiItem key={r.id} r={r} provs={provs} ctx={ctx} onDone={() => { reload(); onChange(); }} />)}</ul>
       : <p className="small muted">Belum ada relasi.</p>}
     {proposer && <div className="form" style={{ marginTop: 8 }}>
       <label className="field">Dokumen ini…<select value={rf.relation_type} onChange={e => setRf({ ...rf, relation_type: e.target.value })}>{RELATION_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
       <label className="field">Dokumen target<select value={rf.target_document_id} onChange={e => setRf({ ...rf, target_document_id: e.target.value })}><option value="">Pilih</option>{docs.filter(d => d.id !== doc.id).map(d => <option key={d.id} value={d.id}>{d.canonical_number}</option>)}</select></label>
       <label className="field">Pasal penetap<select value={rf.citing} onChange={e => setRf({ ...rf, citing: e.target.value })}><option value="">Pilih pasal</option>{provs.map(p => <option key={p.provision_version_id} value={p.provision_version_id}>{p.number_label}</option>)}</select></label>
       <div><button className="btn primary" disabled={busy || !rf.target_document_id || !rf.citing} onClick={() => run(async () => { await api("/corpus/relationships", { body: { source_document_id: doc.id, target_document_id: rf.target_document_id, relation_type: rf.relation_type, citing_provision_version_id: rf.citing } }); setRf({ target_document_id: "", relation_type: "AMENDS", citing: "" }); }, "Relasi diusulkan; menunggu konfirmasi.")}>Usulkan relasi</button></div>
-      <p className="small muted" style={{ margin: 0 }}>Relasi yang mengubah status dokumen (mengubah/mencabut) dikonfirmasi oleh Manajer Kepatuhan.</p>
-    </div>}
+      <p className="small muted" style={{ margin: 0 }}>Relasi disetujui atau ditolak oleh Manajer Kepatuhan; status dokumen berubah otomatis setelah disetujui.</p>   
+  </div>}
   </section>;
 }
 
@@ -481,8 +521,7 @@ function DocGovernance({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ct
   const [provs, setProvs] = useState<Prov[]>([]);
   useEffect(() => { const v = doc.versions[doc.versions.length - 1]; if (v) api<Prov[]>(`/corpus/versions/${v.id}/provisions`).then(setProvs).catch(() => setProvs([])); }, [doc.id]);
   const { run, busy } = useAction(ctx.notify, () => { reloadL(); reloadR(); onChange(); });
-  const analyst = canDo(ctx.me.role, "taxonomy", "U"), manager = ctx.me.role === "COMPLIANCE_MANAGER";
-  const canAddRel = canDo(ctx.me.role, "relationship", "C");
+  const analyst = canDo(ctx.me.role, "taxonomy", "U");  const canAddRel = canDo(ctx.me.role, "relationship", "C");
   if (!canLab && !canRel) return null;  // peran tanpa hak baca label maupun relasi tidak melihat panel ini sama sekali
   return <section className="panel"><h2>Klasifikasi & silsilah</h2>
     {canLab && <>
@@ -494,10 +533,7 @@ function DocGovernance({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ct
     </>}
     {canRel && <>
     <h3 style={{ fontSize: 16, marginTop: 14 }}>Relasi dokumen</h3>
-    {rels?.length ? <ul className="list">{rels.map(r => <li key={r.id} className="between"><span className="small">{r.source} <b>{r.relation_type}</b> {r.target}</span>
-      <span className="row"><Status s={r.state === "PROPOSED" ? "SUBMITTED" : r.state === "CONFIRMED" ? "ACCEPTED" : "REJECTED"} />
-        {manager && r.state === "PROPOSED" && <button className="btn sm" disabled={busy} onClick={() => run(() => api(`/corpus/relationships/${r.id}/confirm`, { method: "POST" }), "Relasi dikonfirmasi; status dokumen target diperbarui.")}>Konfirmasi</button>}</span></li>)}</ul> : <p className="small muted">Belum ada relasi.</p>}
-    {canAddRel && <div className="form" style={{ marginTop: 8 }}>
+    {rels?.length ? <ul className="list">{rels.map(r => <RelasiItem key={r.id} r={r} provs={provs} ctx={ctx} onDone={() => { reloadR(); onChange(); }} />)}</ul> : <p className="small muted">Belum ada relasi.</p>}    {canAddRel && <div className="form" style={{ marginTop: 8 }}>
       <div className="form-2"><label className="field">Dokumen ini…<select value={rf.relation_type} onChange={e => setRf({ ...rf, relation_type: e.target.value })}>{["AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"].map(x => <option key={x}>{x}</option>)}</select></label>
         <label className="field">Dokumen target<select value={rf.target_document_id} onChange={e => setRf({ ...rf, target_document_id: e.target.value })}><option value="">Pilih</option>{docs.filter(d => d.id !== doc.id).map(d => <option key={d.id} value={d.id}>{d.canonical_number}</option>)}</select></label></div>
       <label className="field">Pasal penetap (wajib untuk konfirmasi)<select value={rf.citing} onChange={e => setRf({ ...rf, citing: e.target.value })}><option value="">Pilih pasal</option>{provs.map(p => <option key={p.provision_version_id} value={p.provision_version_id}>{p.number_label}</option>)}</select></label>
