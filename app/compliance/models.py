@@ -14,6 +14,29 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+class LegalPosition(Base):
+    """Posisi hukum Peninjau Hukum (arahan mentor: tabel sendiri, berversi).
+    subject_type + subject_id menunjuk objek yang dieskalasi: APPLICABILITY | OBLIGATION | CHANGE."""
+    __tablename__ = "legal_position"
+    __table_args__ = S
+    id = Column(U(), primary_key=True, default=uuid.uuid4)
+    subject_type = Column(String, nullable=False)
+    subject_id = Column(U(), nullable=False)
+    version = Column(Integer, nullable=False)
+    question = Column(Text)
+    position_text = Column(Text, nullable=False)
+    reviewer_id = Column(U(), ForeignKey("platform.app_user.id"))
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
+class LegalPositionCitation(Base):
+    """Sitasi posisi hukum: menunjuk versi pasal tertentu (provision_version), jadi versi yang dipakai tercatat."""
+    __tablename__ = "legal_position_citation"
+    __table_args__ = S
+    legal_position_id = Column(U(), ForeignKey("compliance.legal_position.id", ondelete="CASCADE"), primary_key=True)
+    provision_version_id = Column(U(), ForeignKey("corpus.provision_version.id", ondelete="RESTRICT"), primary_key=True)
+
+
 class OrganisationProfile(Base):
     __tablename__ = "organisation_profile"
     __table_args__ = S
@@ -41,9 +64,9 @@ class ApplicabilityDecision(Base):
     cited_provision_version_ids = Column(JSONB, nullable=False, default=list)
     scope_provision_version_ids = Column(JSONB, nullable=False, default=list)
     legal_question = Column(Text)
-    legal_answer = Column(Text)
-    legal_reviewer_id = Column(U(), ForeignKey("platform.app_user.id"))
-    submitted_at = Column(DateTime(timezone=True))
+    legal_position_id = Column(U(), ForeignKey("compliance.legal_position.id"))   # posisi hukum (tabel sendiri)
+    legal_position_version = Column(Integer)                                      # versi posisi hukum yang dipakai
+    submitted_at = Column(DateTime(timezone=True))    
     decided_at = Column(DateTime(timezone=True))
     return_reason = Column(Text)
     review_owner_id = Column(U(), ForeignKey("platform.app_user.id"))
@@ -78,8 +101,9 @@ class Obligation(Base):
     low_confidence_reviewed_by = Column(U(), ForeignKey("platform.app_user.id"))
     reopen_reason = Column(Text)
     legal_question = Column(Text)   # FRD Eksibit 33: pertanyaan eskalasi (wajib)
-    legal_answer = Column(Text)     # posisi hukum beserta sitasi (wajib)
-    legal_reviewer_id = Column(U(), ForeignKey("platform.app_user.id"))
+    legal_position_id = Column(U(), ForeignKey("compliance.legal_position.id"))   # posisi hukum (tabel sendiri)
+    legal_position_version = Column(Integer)  # versi posisi hukum yang dipakai
+
 
 class Risk(Base):
     __tablename__ = "risk"

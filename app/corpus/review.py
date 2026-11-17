@@ -11,7 +11,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.compliance.common import get_or_404, iso, now, require_citations, require_text, sid, user_names
+from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names
+from app.compliance.legal_position import legal_position_view, record_legal_position
 from app.compliance.models import ApplicabilityDecision, Control, Obligation, ObligationControlMap
 from app.corpus.models import (Change, ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, Relationship,
                                TaxonomyLabel)
@@ -33,7 +34,9 @@ CHANGE_LEGAL = require("change_review", "U", only=[R.LEGAL_REVIEWER])
 CHANGE_APPROVE = require("change_review", "A")           # Manajer Kepatuhan (titik kendali #1)
 REL_READ = require("relationship", "R")
 REL_CREATE = require("relationship", "C")
-REL_UPDATE = require("relationship", "U")
+# Relasi (arahan mentor): Analis menyunting & mengajukan ulang; Peninjau Hukum hanya memberi catatan / minta revisi.
+REL_UPDATE = require("relationship", "U", only=[R.REGULATORY_ANALYST])
+REL_LEGAL = require("relationship", "U", only=[R.LEGAL_REVIEWER])
 REL_DELETE = require("relationship", "D")
 STATUS_APPROVE = require("doc_status", "A")              # konfirmasi relasi = mengubah status dokumen → persetujuan Manajer
 TAX_READ = require("taxonomy", "R")
@@ -100,11 +103,11 @@ class ReasonIn(BaseModel):
 
 
 # ---------- W5 ----------
-def _change_dto(c: Change, label: str, names: dict) -> dict:
+def _change_dto(db: Session, c: Change, label: str, names: dict) -> dict:
     return {"id": str(c.id), "provision": label, "change_type": c.change_type, "similarity": float(c.similarity or 0),
             "is_material": c.is_material, "diff_html": c.diff_html, "review_state": c.review_state,
             "semantic_type": c.semantic_type, "analyst_material": c.analyst_material, "review_reason": c.review_reason,
-            "legal_question": c.legal_question, "legal_answer": c.legal_answer,
+            "legal_question": c.legal_question, **legal_position_view(db, c.legal_position_id, names),
             "validated_by": names.get(sid(c.validated_by)), "validated_by_id": sid(c.validated_by),
             "validated_at": iso(c.validated_at), "confirmed_by": names.get(sid(c.confirmed_by)),
             "confirmed_at": iso(c.confirmed_at), "return_reason": c.return_reason, "impact": c.impact or {}}
@@ -134,7 +137,7 @@ def get_changeset(cs_id: str, db: Session = Depends(get_db), _: AppUser = Depend
     doc = db.get(Document, nv.document_id)
     rows = db.execute(select(Change, Provision.number_label).join(Provision, Provision.id == Change.provision_id)
                       .where(Change.change_set_id == cs.id)).all()
-    changes = sorted([_change_dto(c, lbl, names) for c, lbl in rows], key=lambda x: x["provision"])
+    changes = sorted([_change_dto(db, c, lbl, names) for c, lbl in rows], key=lambda x: x["provision"])
     return ResponseWrapper(data={"id": str(cs.id), "document": doc.canonical_number, "title": doc.title_id,
                                  "base_version": db.get(DocumentVersion, cs.base_version_id).version_number,
                                  "new_version": nv.version_number, "changes": changes})
@@ -177,11 +180,11 @@ def escalate_change(cid: str, body: QuestionIn, db: Session = Depends(get_db), u
 @router.post("/changes/{cid}/legal-answer", response_model=ResponseWrapper[dict])
 def answer_change(cid: str, body: AnswerIn, db: Session = Depends(get_db), user: AppUser = Depends(CHANGE_LEGAL)):
     c = _change(db, cid, {"ESCALATED"})
-    answer = require_text(body.answer, "answer")
-    labels = require_citations(db, body.citation_provision_version_ids)
-    c.legal_answer, c.review_state = f"{answer}\n\nSitasi: {'; '.join(labels)}", "IN_REVIEW"
+    lp = record_legal_position(db, c, "CHANGE", body.answer, body.citation_provision_version_ids, user.id)
+    c.review_state = "IN_REVIEW"
     audit(db, user.id, "LEGAL_POSITION_RECORDED", "change", c.id,
-          after={"answer": answer, "citation_provision_version_ids": body.citation_provision_version_ids})
+          after={"legal_position_id": str(lp.id), "legal_position_version": lp.version,
+                 "citation_provision_version_ids": body.citation_provision_version_ids})    
     db.commit()
     return ResponseWrapper(data={"id": str(c.id), "review_state": c.review_state})
 
@@ -260,6 +263,8 @@ def list_relationships(document_id: Optional[str] = None, db: Session = Depends(
                                   "target": docs.get(str(r.target_document_id)), "relation_type": r.relation_type,
                                   "state": r.state, "note": r.note, "proposed_by": names.get(sid(r.proposed_by)), "proposed_by_id": sid(r.proposed_by),
                                   "confirmed_by": names.get(sid(r.confirmed_by)),
+                                  "legal_note": r.legal_note, "legal_reviewer": names.get(sid(r.legal_reviewer_id)),
+                                  "reject_reason": r.reject_reason, "rejected_by": names.get(sid(r.rejected_by)),
                                   "source_document_id": str(r.source_document_id),
                                   "target_document_id": str(r.target_document_id),
                                   "citing_provision_version_id": sid(r.citing_provision_version_id)}
@@ -284,6 +289,9 @@ def propose_relationship(body: RelationshipIn, db: Session = Depends(get_db), us
     return ResponseWrapper(data={"id": str(r.id), "state": r.state})
 
 
+REL_EDITABLE = {"PROPOSED", "REVISION_REQUESTED"}
+
+
 class RelationshipUpdateIn(BaseModel):
     relation_type: Optional[str] = None
     citing_provision_version_id: Optional[str] = None
@@ -293,10 +301,10 @@ class RelationshipUpdateIn(BaseModel):
 @router.patch("/relationships/{rid}", response_model=ResponseWrapper[dict])
 def update_relationship(rid: str, body: RelationshipUpdateIn, db: Session = Depends(get_db),
                         user: AppUser = Depends(REL_UPDATE)):
-    """Relasi regulasi: U = Analis & Peninjau Hukum. Hanya relasi yang masih PROPOSED yang dapat disunting."""
+    """Relasi regulasi: hanya Analis yang menyunting, selama masih diajukan atau sedang direvisi."""
     r = get_or_404(db, Relationship, rid)
-    if r.state != "PROPOSED":
-        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya PROPOSED yang dapat disunting")
+    if r.state not in REL_EDITABLE:
+        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya relasi yang diajukan/direvisi yang dapat disunting")       
     before = {"relation_type": r.relation_type, "note": r.note, "citing": sid(r.citing_provision_version_id)}
     if body.relation_type is not None:
         if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
@@ -316,8 +324,8 @@ def update_relationship(rid: str, body: RelationshipUpdateIn, db: Session = Depe
 def delete_relationship(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(REL_DELETE)):
     """Relasi regulasi: D = Analis. Hanya usulan (PROPOSED); relasi CONFIRMED sudah mengubah status dokumen → tidak boleh hilang."""
     r = get_or_404(db, Relationship, rid)
-    if r.state != "PROPOSED":
-        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya usulan (PROPOSED) yang dapat dihapus")
+    if r.state not in REL_EDITABLE:
+        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya usulan yang belum diputuskan yang dapat dihapus")    
     audit(db, user.id, "RELATIONSHIP_DELETED", "relationship", r.id,
           before={"source": str(r.source_document_id), "target": str(r.target_document_id), "type": r.relation_type})
     db.delete(r)
@@ -329,9 +337,7 @@ def delete_relationship(rid: str, db: Session = Depends(get_db), user: AppUser =
 def confirm_relationship(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(STATUS_APPROVE)):
     """Konfirmasi relasi mengubah status dokumen (mis. REVOKED) → persetujuan Manajer Kepatuhan (baris
     'Perubahan status dokumen': Analis C/R/U, Manajer R/A). Pengonfirmasi tidak boleh sama dengan pengusul."""
-    r = get_or_404(db, Relationship, rid)
-    if r.state != "PROPOSED":
-        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}")
+    r = _relationship(db, rid, {"PROPOSED"})
     enforce_maker_checker(user.id, r.proposed_by)
     if not r.citing_provision_version_id:
         raise AppError(422, "CITATION_REQUIRED", "Konfirmasi relasi wajib menyitasi ketentuan penetap (pasal penutup)")
@@ -344,6 +350,74 @@ def confirm_relationship(rid: str, db: Session = Depends(get_db), user: AppUser 
         audit(db, user.id, "DOCUMENT_STATUS_CHANGED", "document", target.id, before={"status": before},
               after={"status": new_status, "relationship_id": str(r.id)})
     audit(db, user.id, "RELATIONSHIP_CONFIRMED", "relationship", r.id)
+    db.commit()
+    return ResponseWrapper(data={"id": str(r.id), "state": r.state})
+
+
+def _relationship(db: Session, rid: str, allowed: set[str]) -> Relationship:
+    r = get_or_404(db, Relationship, rid)
+    if r.state == "REVISION_REQUESTED" and "REVISION_REQUESTED" not in allowed:
+        raise AppError(409, "REVISION_PENDING", "Analis sedang melakukan revisi; tunggu sampai relasi diajukan ulang")
+    if r.state not in allowed:
+        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}")
+    return r
+
+
+class NoteIn(BaseModel):
+    note: str
+
+
+@router.post("/relationships/{rid}/reject", response_model=ResponseWrapper[dict])
+def reject_relationship(rid: str, body: ReasonIn, db: Session = Depends(get_db), user: AppUser = Depends(STATUS_APPROVE)):
+    """Manajer menolak usulan relasi (alasan wajib); status dokumen tidak berubah. Pengusul tidak boleh memutuskan."""
+    r = _relationship(db, rid, {"PROPOSED"})
+    enforce_maker_checker(user.id, r.proposed_by)
+    r.reject_reason, r.rejected_by, r.state = require_text(body.reason, "reason"), user.id, "REJECTED"
+    audit(db, user.id, "RELATIONSHIP_REJECTED", "relationship", r.id, before={"state": "PROPOSED"},
+          after={"state": r.state, "reason": r.reject_reason})
+    db.commit()
+    return ResponseWrapper(data={"id": str(r.id), "state": r.state})
+
+
+@router.post("/relationships/{rid}/legal-note", response_model=ResponseWrapper[dict])
+def legal_note_relationship(rid: str, body: NoteIn, db: Session = Depends(get_db), user: AppUser = Depends(REL_LEGAL)):
+    """Peninjau Hukum memberi catatan hukum tanpa mengubah relasi; Manajer tetap boleh memutuskan."""
+    r = _relationship(db, rid, {"PROPOSED"})
+    before = {"legal_note": r.legal_note}
+    r.legal_note, r.legal_reviewer_id = require_text(body.note, "note"), user.id
+    audit(db, user.id, "RELATIONSHIP_LEGAL_NOTE", "relationship", r.id, before=before, after={"legal_note": r.legal_note})
+    db.commit()
+    return ResponseWrapper(data={"id": str(r.id), "state": r.state})
+
+
+@router.post("/relationships/{rid}/request-revision", response_model=ResponseWrapper[dict])
+def request_revision_relationship(rid: str, body: NoteIn, db: Session = Depends(get_db), user: AppUser = Depends(REL_LEGAL)):
+    """Peninjau Hukum minta revisi (catatan wajib): PROPOSED → REVISION_REQUESTED. Manajer menunggu revisi Analis."""
+    r = _relationship(db, rid, {"PROPOSED"})
+    r.legal_note, r.legal_reviewer_id, r.state = require_text(body.note, "note"), user.id, "REVISION_REQUESTED"
+    audit(db, user.id, "RELATIONSHIP_REVISION_REQUESTED", "relationship", r.id, before={"state": "PROPOSED"},
+          after={"state": r.state, "legal_note": r.legal_note})
+    db.commit()
+    return ResponseWrapper(data={"id": str(r.id), "state": r.state})
+
+
+@router.post("/relationships/{rid}/resubmit", response_model=ResponseWrapper[dict])
+def resubmit_relationship(rid: str, body: RelationshipUpdateIn, db: Session = Depends(get_db),
+                          user: AppUser = Depends(REL_UPDATE)):
+    """Analis merevisi lalu mengajukan ulang: REVISION_REQUESTED → PROPOSED (kembali menunggu Manajer)."""
+    r = _relationship(db, rid, {"REVISION_REQUESTED"})
+    before = {"state": r.state, "relation_type": r.relation_type, "citing": sid(r.citing_provision_version_id), "note": r.note}
+    if body.relation_type is not None:
+        if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
+            raise AppError(422, "BAD_RELATION_TYPE", "relation_type tidak dikenal")
+        r.relation_type = body.relation_type
+    if body.citing_provision_version_id:
+        r.citing_provision_version_id = body.citing_provision_version_id
+    if body.note is not None:
+        r.note = body.note
+    r.state = "PROPOSED"
+    audit(db, user.id, "RELATIONSHIP_RESUBMITTED", "relationship", r.id, before=before,
+          after={"state": r.state, "relation_type": r.relation_type, "citing": sid(r.citing_provision_version_id), "note": r.note})
     db.commit()
     return ResponseWrapper(data={"id": str(r.id), "state": r.state})
 
