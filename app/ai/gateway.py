@@ -67,6 +67,12 @@ def verify_grounding(phrases: list[str], source_text: str) -> bool:
 OBLIGATION_RE = re.compile(r"\b(wajib|diwajibkan|harus)\b", re.I)
 PROHIBITION_RE = re.compile(r"\bdilarang\b", re.I)
 NEGATED_RE = re.compile(r"\btidak\s+(wajib|diwajibkan|harus|dilarang)\b", re.I)
+DEFINITION_TERM_RE = re.compile(
+    r"\b(?:wajib|diwajibkan|harus)\b"
+    r"(?P<tail>(?:\s+[A-Za-zÀ-ÿ0-9/-]+){0,5})"
+    r"\s+adalah\b",
+    re.I,
+)
 REGULATOR_SUBJECT_RE = re.compile(r"^\s*(Otoritas Jasa Keuangan|OJK|Bank Indonesia|PPATK|Menteri|Pemerintah|Kementerian)\b", re.I)
 
 
@@ -82,6 +88,11 @@ def _rule_based_extract(text: str) -> str:
         if not m or NEGATED_RE.search(s):
             continue
         subject = s[:m.start()]
+        # Abaikan istilah definisi yang menggunakan kata Wajib,
+        # misalnya "Laporan Wajib adalah ..." atau
+        # "Rasio Wajib Pemenuhan adalah ...".
+        if DEFINITION_TERM_RE.search(s):
+            continue
         if re.search(r"\badalah\b", subject, re.I) or REGULATOR_SUBJECT_RE.search(subject):
             continue
         prohibited = m is m_pro

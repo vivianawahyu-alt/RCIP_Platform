@@ -180,11 +180,11 @@ def export_document(db, doc: Document) -> int:
             labels[(lb.dimension, lb.value)] = {"dimension": lb.dimension, "value": lb.value, "state": lb.state,
                                                 "source": lb.source, "reason": lb.reason}
     src = db.get(RegulatorySource, doc.source_id)
+    doc_fields = {}
     if old and old.get("meta_updated_at") and _ts(old["meta_updated_at"]) > _ts(_meta_revision(db, doc)):
-        # data dokumen di folder lebih baru (diubah di laptop lain, belum diimpor di sini) → pertahankan
-                doc_fields.update({k: old.get(k) for k in CATALOG_KEYS})
-    else:
-        doc_fields = {}
+        # Data dokumen di folder lebih baru (diubah di laptop lain, belum diimpor di sini) → pertahankan.
+        doc_fields.update({k: old.get(k) for k in CATALOG_KEYS})
+
     _write(meta_path, {
         "format": FORMAT, "id": old.get("id", str(doc.id)),
         "canonical_number": doc.canonical_number, "instrument_type": doc.instrument_type, "issuer": doc.issuer,
@@ -431,62 +431,119 @@ def _import_deleted_document(db, doc: Document, meta: dict, folder: Path, stats:
     stats["dokumen_dihapus"] += 1
 
 
+
 def _import_document(db, folder: Path, stats: dict) -> None:
     meta = _read(folder / "dokumen.json")
     doc = db.scalar(select(Document).where(Document.canonical_number == meta["canonical_number"]))
+
     if meta.get("deleted_at"):
         if doc is not None:
             _import_deleted_document(db, doc, meta, folder, stats)
         return
+
     if doc is None:  # dokumen belum ada di laptop ini → buat
-        doc = Document(id=_free_id(db, Document, meta.get("id")), source_id=_get_source(db, meta["source"]).id,
-                       canonical_number=meta["canonical_number"], instrument_type=meta["instrument_type"],
-                       issuer=meta["issuer"], title_id=meta["title_id"], status="DRAFT",
-                       created_at=_ts(meta["created_at"]))
+        doc = Document(
+            id=_free_id(db, Document, meta.get("id")),
+            source_id=_get_source(db, meta["source"]).id,
+            canonical_number=meta["canonical_number"],
+            instrument_type=meta["instrument_type"],
+            issuer=meta["issuer"],
+            title_id=meta["title_id"],
+            status="DRAFT",
+            created_at=_ts(meta["created_at"]),
+        )
         _apply_catalog(doc, meta, overwrite=True)
 
         db.add(doc)
         db.flush()
-        audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name, "created": True,
-                                                                "meta_updated_at": meta.get("meta_updated_at")})
+        audit(
+            db, None, SYNC_ACTION, "document", doc.id,
+            after={
+                "from": folder.name,
+                "created": True,
+                "meta_updated_at": meta.get("meta_updated_at"),
+            },
+        )
         stats["dokumen_baru"] += 1
-        
-    elif meta.get("meta_updated_at") and _ts(meta["meta_updated_at"]) > _ts(_meta_revision(db, doc)):
-        # judul / jenis / penerbit diubah di laptop lain lebih baru → terapkan di sini
-        doc.title_id, doc.instrument_type, doc.issuer = meta["title_id"], meta["instrument_type"], meta["issuer"]
-        audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name,
-                                                                "meta_updated_at": meta["meta_updated_at"]})
+
+    elif (
+        meta.get("meta_updated_at")
+        and _ts(meta["meta_updated_at"]) > _ts(_meta_revision(db, doc))
+    ):
+        # Metadata dokumen di folder lebih baru.
+        doc.title_id = meta["title_id"]
+        doc.instrument_type = meta["instrument_type"]
+        doc.issuer = meta["issuer"]
+        _apply_catalog(doc, meta, overwrite=True)
+
+        audit(
+            db, None, SYNC_ACTION, "document", doc.id,
+            after={
+                "from": folder.name,
+                "meta_updated_at": meta["meta_updated_at"],
+            },
+        )
         stats["dokumen_diperbarui"] += 1
 
-    have = {(lb.dimension, lb.value): lb for lb in db.scalars(
-        select(TaxonomyLabel).where(TaxonomyLabel.document_id == doc.id))}
-    for lb in meta.get("labels", []):
-        cur = have.get((lb["dimension"], lb["value"]))
-        if cur is None:
-            db.add(TaxonomyLabel(document_id=doc.id, dimension=lb["dimension"], value=lb["value"],
-                                 state=lb["state"], source=lb.get("source") or "RULE", reason=lb.get("reason")))
-        elif lb["state"] == "CONFIRMED" and cur.state != "CONFIRMED":
-            cur.state = "CONFIRMED"
-            doc.title_id, doc.instrument_type, doc.issuer = meta["title_id"], meta["instrument_type"], meta["issuer"]
-        _apply_catalog(doc, meta, overwrite=True)
-        audit(db, None, SYNC_ACTION, "document", doc.id, after={"from": folder.name,
-                                                                "meta_updated_at": meta.get["meta_updated_at"]})
-        stats["dokumen_diperbarui"] += 1
-    else:  # tidak lebih baru: hanya isi metadata katalog yang masih kosong
+    else:
+        # Tidak lebih baru: hanya isi metadata katalog yang masih kosong.
         _apply_catalog(doc, meta, overwrite=False)
 
-    local = {dv.sha256: dv for dv in db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == doc.id))}
-    files = [_read(p) for p in sorted((folder / "versi").glob("*.json"))] if (folder / "versi").exists() else []
-    # urutan sama di semua laptop: tanggal berlaku lalu sidik jari (penanda hapus di akhir)
-    for v in sorted(files, key=lambda x: (x.get("effective_date", "9999"), x["sha256"])):
+    have = {
+        (lb.dimension, lb.value): lb
+        for lb in db.scalars(
+            select(TaxonomyLabel).where(TaxonomyLabel.document_id == doc.id)
+        )
+    }
+
+    for lb in meta.get("labels", []):
+        cur = have.get((lb["dimension"], lb["value"]))
+
+        if cur is None:
+            db.add(
+                TaxonomyLabel(
+                    document_id=doc.id,
+                    dimension=lb["dimension"],
+                    value=lb["value"],
+                    state=lb["state"],
+                    source=lb.get("source") or "RULE",
+                    reason=lb.get("reason"),
+                )
+            )
+        elif lb["state"] == "CONFIRMED" and cur.state != "CONFIRMED":
+            cur.state = "CONFIRMED"
+
+    local = {
+        dv.sha256: dv
+        for dv in db.scalars(
+            select(DocumentVersion).where(
+                DocumentVersion.document_id == doc.id
+            )
+        )
+    }
+
+    files = (
+        [_read(p) for p in sorted((folder / "versi").glob("*.json"))]
+        if (folder / "versi").exists()
+        else []
+    )
+
+    # Urutan sama di semua laptop: tanggal berlaku lalu sidik jari.
+    for v in sorted(
+        files,
+        key=lambda x: (x.get("effective_date", "9999"), x["sha256"]),
+    ):
         _import_version(db, doc, folder, v, local, stats)
 
-    # status dokumen mengikuti versinya (sama seperti aplikasi)
+    # Status dokumen mengikuti versinya.
     states = {dv.state for dv in local.values()}
+
     if "PUBLISHED" in states:
         doc.status = "IN_FORCE"
     elif doc.status == "IN_FORCE":
         doc.status = "DRAFT"
+
+
 
 
 def import_all() -> dict:

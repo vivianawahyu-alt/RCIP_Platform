@@ -4,6 +4,7 @@ from datetime import date
 
 from sqlalchemy import distinct, exists, func, or_, select, text
 from sqlalchemy.orm import Session
+from app.shared.storage import object_exists
 
 from app.corpus.models import (Document, DocumentVersion, Provision, ProvisionVersion, RegulatorySource, Relationship,
                                TaxonomyLabel)
@@ -213,7 +214,7 @@ def document_detail(db: Session, doc: Document) -> dict:
         "versions": [{"id": str(v.id), "version_number": v.version_number, "state": v.state,
                       "effective_date": str(v.effective_date), "extraction_method": v.extraction_method,
                       "provision_count": counts.get(v.id, 0), "origin_url": v.origin_url, "file_name": v.file_name,
-                      "size_bytes": v.size_bytes, "has_file": bool(v.canonical_text_ref)} for v in vs],
+                      "size_bytes": v.size_bytes, "has_file": object_exists(v.canonical_text_ref)} for v in vs],
         "relations": relations,
         "cited_by": [r for r in relations if r["direction"] == "in" and r["relation_type"] == "REFERS_TO"],
     }

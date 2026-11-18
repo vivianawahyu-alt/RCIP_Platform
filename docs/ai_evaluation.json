@@ -1,26 +1,19 @@
 {
-  "generated_at": "2026-10-27T11:16:45.168534+00:00",
+  "generated_at": "2026-11-18T04:22:29.782546+00:00",
   "extraction": {
     "model_id": "rule-based-v2",
     "standard": {
       "tp": 69,
-      "fp": 1,
+      "fp": 0,
       "fn": 0,
-      "tn": 11,
+      "tn": 12,
       "schema_invalid": 0,
       "grounding_failed": 0,
       "cases": 81,
-      "errors": [
-        {
-          "document": "PBI S-07/2024",
-          "pasal": "1",
-          "kind": "DEF",
-          "error": "FP"
-        }
-      ],
-      "precision": 0.986,
+      "errors": [],
+      "precision": 1.0,
       "recall": 1.0,
-      "f1": 0.993
+      "f1": 1.0
     },
     "adversarial": {
       "cases": [
@@ -58,9 +51,9 @@
           "id": "definition_with_keyword",
           "trap": "definisi istilah yang memuat kata 'Wajib'",
           "expected": false,
-          "predicted": true,
-          "n_obligations": 1,
-          "correct": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
           "deadline_ok": null,
           "grounded": true
         },
@@ -185,10 +178,10 @@
           "grounded": true
         }
       ],
-      "correct": 15,
+      "correct": 16,
       "deadline_checked": 4,
       "deadline_correct": 4,
-      "accuracy": 0.938
+      "accuracy": 1.0
     },
     "heldout": {
       "cases": [
@@ -226,9 +219,9 @@
           "id": "h_definition_2",
           "trap": "",
           "expected": false,
-          "predicted": true,
-          "n_obligations": 1,
-          "correct": false,
+          "predicted": false,
+          "n_obligations": 0,
+          "correct": true,
           "deadline_ok": null,
           "grounded": true
         },
@@ -293,10 +286,10 @@
           "grounded": true
         }
       ],
-      "correct": 9,
+      "correct": 10,
       "deadline_checked": 1,
       "deadline_correct": 1,
-      "accuracy": 0.9
+      "accuracy": 1.0
     }
   },
   "extraction_baseline_v1": {
@@ -690,12 +683,19 @@
   },
   "copilot": {
     "grounded_questions": 30,
-    "hit_at_3": 0.967,
-    "answered": 29,
+    "hit_at_3": 0.933,
+    "answered": 28,
     "citation_rate": 1.0,
     "out_of_corpus": 10,
     "refusal_rate": 1.0,
     "misses": [
+      {
+        "q": "Seberapa sering pengujian pemulihan bencana dilakukan?",
+        "expected": [
+          "POJK 11/POJK.03/2022|Pasal 20"
+        ],
+        "got": []
+      },
       {
         "q": "Berapa hari tindak lanjut pengaduan konsumen?",
         "expected": [
@@ -725,7 +725,7 @@
       1.0
     ],
     "copilot_hit_at_3": [
-      0.967,
+      0.933,
       0.8
     ]
   },
