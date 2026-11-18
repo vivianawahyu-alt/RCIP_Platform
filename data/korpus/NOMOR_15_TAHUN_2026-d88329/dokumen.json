@@ -2,18 +2,23 @@
   "canonical_number": "NOMOR 15 TAHUN 2026",
   "created_at": "2026-11-04T04:35:03.476353+00:00",
   "deleted_at": null,
+  "enacted_date": null,
   "format": 2,
+  "gazette_ref": null,
   "id": "c04b89d8-523f-4486-ab35-84664c29147d",
   "instrument_type": "POJK",
   "issuer": "Otoritas Jasa Keuangan",
   "labels": [],
+  "meta_updated_at": "2026-11-04T04:35:03.476353+00:00",
+  "promulgated_date": null,
   "source": {
     "base_url": "https://www.ojk.go.id",
     "category": "OJK",
     "issuer_name": "Otoritas Jasa Keuangan",
     "name": "OJK",
-    "permitted_use_statement": null,
+    "permitted_use_statement": "Dokumen regulasi publik; dipakai untuk keperluan akademik capstone dengan sitasi sumber resmi.",
     "status": "ACTIVE"
   },
-  "title_id": "PENAHAPAN PERALIHAN TUGAS DAN WEWENANG PENGATURAN DAN PENGAWASAN TRANSAKSI PADA BURSA MINERAL DAN KOMODITAS STRATEGIS DARI BADAN PENGAWAS PERDAGANGAN BERJANGKA KOMODITI KE OTORITAS JASA KEUANGAN"
+  "title_id": "PENAHAPAN PERALIHAN TUGAS DAN WEWENANG PENGATURAN DAN PENGAWASAN TRANSAKSI PADA BURSA MINERAL DAN KOMODITAS STRATEGIS DARI BADAN PENGAWAS PERDAGANGAN BERJANGKA KOMODITI KE OTORITAS JASA KEUANGAN",
+  "year": 2026
 }

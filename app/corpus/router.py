@@ -27,7 +27,7 @@ from app.platform.permissions import allows, require, require_any
 from app.shared.database import get_db
 from app.shared.errors import AppError
 from app.shared.schemas import CitationResolveRequest, CitationResolveResponse, ResponseWrapper
-from app.shared.storage import get_object, put_object
+from app.shared.storage import get_object, object_exists, put_object
 from app.shared.vocabularies import AppRole, VersionState
 
 router = APIRouter(tags=["corpus"])
@@ -169,7 +169,7 @@ def list_documents(db: Session = Depends(get_db),
                                   "extraction_method": v.extraction_method,
                                   # provenans (FR-RKM-002): asal & berkas aslinya
                                   "origin_url": v.origin_url, "file_name": v.file_name,
-                                  "size_bytes": v.size_bytes, "has_file": bool(v.canonical_text_ref)} for v in vs]})
+                                  "size_bytes": v.size_bytes, "has_file": object_exists(v.canonical_text_ref)} for v in vs]})
     return ResponseWrapper(data=out)
 
 

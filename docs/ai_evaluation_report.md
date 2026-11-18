@@ -1,6 +1,6 @@
 # Laporan Evaluasi AI — RCIP
 
-_Dibangkitkan otomatis oleh `python -m app.ai.evaluate` pada 2026-10-27T11:16:45 UTC. Model ekstraksi: `rule-based-v2`._
+_Dibangkitkan otomatis oleh `python -m app.ai.evaluate` pada 2026-11-18T04:22:29 UTC. Model ekstraksi: `rule-based-v2`._
 
 ## Ringkasan terhadap target
 
@@ -10,7 +10,7 @@ _Dibangkitkan otomatis oleh `python -m app.ai.evaluate` pada 2026-10-27T11:16:45
 | Halusinasi tertangkap grounding | 100.0% | ≥ 100.0% | Tercapai |
 | Jawaban copilot bersitasi (SM-09) | 100.0% | ≥ 100.0% | Tercapai |
 | Penolakan di luar korpus (SM-10) | 100.0% | ≥ 100.0% | Tercapai |
-| Copilot menemukan pasal benar (hit@3) | 96.7% | ≥ 80.0% | Tercapai |
+| Copilot menemukan pasal benar (hit@3) | 93.3% | ≥ 80.0% | Tercapai |
 
 Ekstraksi kewajiban tidak diberi target lulus/gagal karena TRD menyatakan akurasi model tidak dijanjikan sebelum baseline disepakati; angka di bawah adalah baseline.
 
@@ -20,20 +20,16 @@ Set standar: 81 pasal unik korpus sintetis, label jenis ditetapkan manual (OBL/P
 
 | Presisi | Recall | F1 | TP | FP | FN | TN | Skema tidak valid | Grounding gagal |
 |---|---|---|---|---|---|---|---|---|
-| 98.6% | 100.0% | 99.3% | 69 | 1 | 0 | 11 | 0 | 0 |
+| 100.0% | 100.0% | 100.0% | 69 | 0 | 0 | 12 | 0 | 0 |
 
-Kesalahan pada set standar:
-
-- PBI S-07/2024 1 (DEF): FP
-
-Set adversarial (16 jebakan, TRD §13.5): akurasi 93.8%; tenggat benar 4/4.
+Set adversarial (16 jebakan, TRD §13.5): akurasi 100.0%; tenggat benar 4/4.
 
 | Kasus | Jebakan | Diharapkan | Prediksi | Benar | Tenggat |
 |---|---|---|---|---|---|
 | `considerans_date` | tanggal di konsiderans bukan tenggat | bukan | 0 kewajiban | ya | - |
 | `cross_reference_recipient` | pihak penerima dalam rujukan silang bukan penerima kewajiban | bukan | 0 kewajiban | ya | - |
 | `may_not_must` | 'dapat' (boleh) bukan 'wajib' | bukan | 0 kewajiban | ya | - |
-| `definition_with_keyword` | definisi istilah yang memuat kata 'Wajib' | bukan | 1 kewajiban | TIDAK | - |
+| `definition_with_keyword` | definisi istilah yang memuat kata 'Wajib' | bukan | 0 kewajiban | ya | - |
 | `annex_deadline` | tenggat di lampiran yang tidak diurai platform | kewajiban | 1 kewajiban | ya | ya |
 | `negated_obligation` | pengecualian 'tidak wajib' | bukan | 0 kewajiban | ya | - |
 | `prohibition` | larangan juga kewajiban (prohibited action) | kewajiban | 1 kewajiban | ya | - |
@@ -47,7 +43,7 @@ Set adversarial (16 jebakan, TRD §13.5): akurasi 93.8%; tenggat benar 4/4.
 | `diwajibkan_form` | bentuk pasif 'diwajibkan' | kewajiban | 1 kewajiban | ya | - |
 | `recommendation` | anjuran 'sebaiknya' bukan kewajiban | bukan | 0 kewajiban | ya | - |
 
-Held-out: 9/10 benar; salah: h_definition_2.
+Held-out: 10/10 benar.
 
 **Interpretasi.** v1 hanya mengenali kata `wajib`, sehingga gagal pada larangan, sinonim (`harus`, `diwajibkan`), negasi, definisi yang memuat kata Wajib, dan kewajiban milik regulator. v2 menangani pola tersebut tetapi tetap pendekatan aturan: tidak memahami konteks, rujukan silang, atau lampiran. Karena itu setiap draf diberi keyakinan 0,60 (di bawah `ai.confidence_floor` 0,70) dan wajib ditinjau manual (E8.3); AI_DRAFT tidak pernah masuk angka kepatuhan. Bila LLM dikonfigurasi, keluarannya melewati validasi skema dan grounding yang sama; jalankan ulang evaluasi untuk membandingkan.
 
@@ -70,9 +66,10 @@ Presisi flag material otomatis: 87.5% (FP 1). Perubahan redaksional ditandai mat
 
 ## 4. Copilot advisori
 
-- Pertanyaan bersumber: 30; pasal benar dalam 3 teratas: 96.7%.
-- Jawaban yang disajikan: 29; seluruhnya bersitasi pasal tersimpan: 100.0%.
+- Pertanyaan bersumber: 30; pasal benar dalam 3 teratas: 93.3%.
+- Jawaban yang disajikan: 28; seluruhnya bersitasi pasal tersimpan: 100.0%.
 - Pertanyaan di luar korpus: 10; ditolak INSUFFICIENT_BASIS: 100.0%.
+- Meleset: "Seberapa sering pengujian pemulihan bencana dilakukan?" → tidak ada (diharapkan ['POJK 11/POJK.03/2022|Pasal 20'])
 - Meleset: "Berapa hari tindak lanjut pengaduan konsumen?" → tidak ada (diharapkan ['POJK S-22/2023|Pasal 33', 'PBI S-03/2023|Pasal 14'])
 
 Moda saat ini: retrieval-only (E15.1) — tanpa narasi generatif, setiap pernyataan adalah kutipan pasal, sehingga pernyataan faktual tanpa sitasi = 0 secara konstruksi.

@@ -12,7 +12,7 @@ cp .env.example .env
 docker compose up -d --build
 docker compose exec api alembic upgrade head
 docker compose exec api python -m seed.run          # data minimal; ATAU di DB kosong: python -m seed.generate --seed 42
-docker compose exec api pytest -q                    # 39 test
+docker compose exec api pytest -q
 cd web && npm install && npm run dev                 # http://localhost:5173 · API http://localhost:8000/docs
 ```
 Login: `analyst` · `officer` · `owner` · `legal` · `manager` · `auditor` · `executive` · `admin` — password `demo1234`.

@@ -68,3 +68,32 @@ def get_object(key: str) -> bytes | None:
             resp.release_conn()
     except Exception:  # noqa: BLE001
         return None
+
+def object_exists(key: str) -> bool:
+    """Periksa keberadaan objek tanpa mengunduh isi berkas."""
+    global _minio_down
+
+    try:
+        p = _local_path(key)
+        if p.is_file():
+            return True
+    except (ValueError, OSError):
+        return False
+
+    if _minio_down:
+        return False
+
+    try:
+        _client().stat_object(settings.MINIO_BUCKET_NAME, key)
+        return True
+    except Exception as e:  # noqa: BLE001
+        try:
+            from minio.error import S3Error
+            if isinstance(e, S3Error):
+                return False
+        except ImportError:
+            pass
+
+        _minio_down = True
+        logger.info("MinIO tidak tersedia (%s); pemeriksaan dilanjutkan melalui penyimpanan lokal", e.__class__.__name__)
+        return False
