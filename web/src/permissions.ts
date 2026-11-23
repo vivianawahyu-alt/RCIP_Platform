@@ -35,7 +35,7 @@ export const MATRIX: Record<string, Record<string, string>> = {
   "relationship": {
     "REGULATORY_ANALYST": "CRUD",
     "COMPLIANCE_OFFICER": "R",
-    "LEGAL_REVIEWER": "RU",
+    "LEGAL_REVIEWER": "R",
     "COMPLIANCE_MANAGER": "RA",
     "INTERNAL_AUDITOR": "R"
   },
