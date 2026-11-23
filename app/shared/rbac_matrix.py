@@ -45,7 +45,7 @@ _RAW: dict[str, tuple[str, ...]] = {
     "ingestion":            ("CRUX", "R",     "",        "R",   "R",   "R", "",  "RX"),     # Ingestion dokumen (unggah/ambil URL)
     "document_version":     ("CR",   "R",     "",        "R",   "R",   "R", "R", "R"),      # Document Version (imutabel)
     "provision_correction": ("CRU",  "R",     "",        "R",   "R",   "R", "",  ""),       # Koreksi segmentasi Provision
-    "relationship":         ("CRUD", "R",     "",        "RU",  "RA",  "R", "",  ""),       # Relasi regulasi
+    "relationship": ("CRUD", "R", "", "R", "RA", "R", "", ""),  # Relasi regulasi
     "doc_status":           ("CRU",  "R",     "",        "R",   "RA",  "R", "",  ""),       # Perubahan status dokumen
     "taxonomy":             ("CRU",  "CRU",   "",        "R",   "R",   "R", "",  "CRUD"),   # Penetapan Taxonomy Label
     "corpus_search":        ("R",    "R",     "R",       "R",   "R",   "R", "R", "R"),      # Pencarian korpus

@@ -16,7 +16,7 @@ source_registry       | CRU   | R   | -     | R  | R  | R | -  | CRUD
 ingestion             | CRUX  | R   | -     | R  | R  | R | -  | RX
 document_version      | CR    | R   | -     | R  | R  | R | R  | R
 provision_correction  | CRU   | R   | -     | R  | R  | R | -  | -
-relationship          | CRUD  | R   | -     | RU | RA | R | -  | -
+relationship          | CRUD  | R   | -     | R  | RA | R | -  | -
 doc_status            | CRU   | R   | -     | R  | RA | R | -  | -
 taxonomy              | CRU   | CRU | -     | R  | R  | R | -  | CRUD
 corpus_search         | R     | R   | R     | R  | R  | R | R  | R

@@ -36,7 +36,7 @@ REL_READ = require("relationship", "R")
 REL_CREATE = require("relationship", "C")
 # Relasi (arahan mentor): Analis menyunting & mengajukan ulang; Peninjau Hukum hanya memberi catatan / minta revisi.
 REL_UPDATE = require("relationship", "U", only=[R.REGULATORY_ANALYST])
-REL_LEGAL = require("relationship", "U", only=[R.LEGAL_REVIEWER])
+REL_LEGAL = require("relationship", "R", only=[R.LEGAL_REVIEWER])
 REL_DELETE = require("relationship", "D")
 STATUS_APPROVE = require("doc_status", "A")              # konfirmasi relasi = mengubah status dokumen → persetujuan Manajer
 TAX_READ = require("taxonomy", "R")
