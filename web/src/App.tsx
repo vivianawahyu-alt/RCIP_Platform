@@ -21,11 +21,13 @@ import { Cari } from "./pages/Cari";
 import { Keberlakuan } from "./pages/Keberlakuan";
 import { Admin } from "./pages/Admin";
 import { Sumber } from "./pages/Sumber";  // [A19] halaman registri sumber regulasi
+import { AntrianLegal } from "./pages/AntrianLegal";
 
 
 type Item = { route: string; label: string; desc: string; only?: Role[] };
 const MENU: { label: string; items: Item[] }[] = [
   { label: "Beranda", items: [{ route: "beranda", label: "Beranda", desc: "Postur kepatuhan", only: ["EXECUTIVE"] }] },
+  { label: "Antrian hukum", items: [{ route: "antrian-hukum", label: "Antrian hukum", desc: "Eskalasi yang menunggu posisi hukum", only: ["LEGAL_REVIEWER"] }] },
   { label: "Kontrol saya", items: [{ route: "kontrol-saya", label: "Kontrol saya", desc: "Bukti & temuan milik Anda", only: ["BUSINESS_CONTROL_OWNER"]},
     { route: "regulasi", label: "Korpus & pasal", desc: "Dokumen, versi imutabel, dan teks pasal" },
     { route: "katalog", label: "Katalog peraturan", desc: "Telusuri seluruh peraturan" },
@@ -65,8 +67,8 @@ export default function App() {
   // pesan lama dibersihkan saat pindah halaman; pesan dari aksi yang baru saja memicu navigasi tetap tampil
   useEffect(() => setMsg(m => (m && Date.now() - m.at < 1500 ? m : null)), [route]);
 
-  // Peninjau Hukum langsung diarahkan ke halaman kerjanya (Perubahan regulasi)
-  if (!me || !hasToken()) return <Login onDone={m => { setMe(m); if (m.role === "LEGAL_REVIEWER") go("perubahan"); }} />;  const ctx: Ctx = { me, notify, go, openCite };
+  // Peninjau Hukum langsung diarahkan ke halaman kerjanya (Antrian hukum)
+  if (!me || !hasToken()) return <Login onDone={m => { setMe(m); if (m.role === "LEGAL_REVIEWER") go("antrian-hukum"); }} />;  const ctx: Ctx = { me, notify, go, openCite };
   const [page, param] = route.split("/");
   const logout = () => { setToken(""); sessionStorage.removeItem("rcip_me"); setMe(null); };
   const search = (e: FormEvent) => { e.preventDefault(); if (q.trim()) go(`cari/${encodeURIComponent(kind)}/${encodeURIComponent(q.trim())}`); };
@@ -107,8 +109,8 @@ export default function App() {
       {canSeePage(me.role, page) && page === "beranda" && (me.role === "EXECUTIVE" ? <Postur ctx={ctx} /> : <Beranda ctx={ctx} />)}
 {canSeePage(me.role, page) && page === "kontrol-saya" && <KontrolSaya ctx={ctx} />}
       {canSeePage(me.role, page) && page === "regulasi" && <Regulasi ctx={ctx} />}
-      {canSeePage(me.role, page) && page === "perubahan" && <Perubahan ctx={ctx} />}
-      {canSeePage(me.role, page) && page === "sumber" && <Sumber ctx={ctx} />}
+      {canSeePage(me.role, page) && page === "perubahan" && <Perubahan ctx={ctx} initial={param} />}
+      {canSeePage(me.role, page) && page === "antrian-hukum" && <AntrianLegal ctx={ctx} />}      {canSeePage(me.role, page) && page === "sumber" && <Sumber ctx={ctx} />}
       {canSeePage(me.role, page) && page === "keberlakuan" && <Keberlakuan ctx={ctx} />}
       {canSeePage(me.role, page) && page === "admin" && <Admin ctx={ctx} />}
       {canSeePage(me.role, page) && page === "kewajiban" && <Kewajiban ctx={ctx} />}

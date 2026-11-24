@@ -15,7 +15,7 @@ Aturan umum: tombol yang tidak sesuai peran Anda tidak ditampilkan, dan server t
 ## Analis Regulasi (`analyst`)
 
 1. **Korpus & pasal** — daftarkan dokumen, unggah versi (.pdf/.txt), periksa hasil segmentasi pasal, lalu **Publikasikan** (versi terbit tidak dapat diubah).
-2. **Klasifikasi & silsilah** (panel kanan Korpus) — konfirmasi atau hapus label saran aturan; usulkan relasi *mengubah/mencabut* dengan memilih pasal penetap.
+2. **Klasifikasi & silsilah** (panel kanan Korpus) — konfirmasi atau hapus label saran aturan; usulkan relasi *mengubah/mencabut* dengan memilih pasal penetap. Bila Peninjau Hukum meminta revisi (status *Analis sedang melakukan revisi*), perbaiki jenis relasi atau pasal penetap lalu klik **Ajukan ulang**. Analis tidak dapat menyetujui relasinya sendiri.
 3. **Perubahan regulasi** — klik *Bandingkan* untuk dokumen dengan dua versi terbit. Untuk tiap perubahan: pilih materialitas dan jenis, tulis alasan, **Simpan validasi**. Bila ragu secara hukum, **Eskalasi** ke Peninjau Hukum. Indikasi material dari sistem hanyalah petunjuk.
 
 ## Pejabat Kepatuhan (`officer`)
@@ -35,7 +35,13 @@ Hanya melihat temuan, tindakan, dan bukti milik sendiri.
 
 ## Peninjau Hukum (`legal`)
 
-Jawab eskalasi di **Perubahan regulasi** dan **Keberlakuan** dengan posisi hukum beserta sitasinya. Dapat membaca jejak audit.
+Peninjau Hukum memberi pendapat hukum, bukan keputusan. Peran ini tidak menilai materialitas, tidak memvalidasi kewajiban, dan tidak mengubah relasi (hak relasi: hanya baca).
+
+1. **Antrian hukum** (halaman awal setelah login) — semua eskalasi yang menunggu posisi hukum dari Perubahan regulasi, Keberlakuan, dan Kewajiban, ditambah relasi yang menunggu persetujuan Manajer. Klik **Buka** untuk menuju halamannya.
+2. **Jawab eskalasi** (status *Menunggu Peninjau Hukum*): tulis posisi hukum lalu pilih minimal satu pasal yang disitasi. Tanpa sitasi, jawaban ditolak. Setelah dikirim, objek kembali ke pembuatnya (Analis atau Pejabat Kepatuhan) untuk dilanjutkan.
+3. **Relasi dokumen** — dari Antrian hukum atau panel Relasi dokumen: pilih **Simpan catatan** (Manajer tetap dapat memutuskan) atau **Minta revisi** (catatan wajib; Manajer harus menunggu sampai Analis mengajukan ulang).
+4. Posisi hukum disimpan berversi (v1, v2, …) di tabel `compliance.legal_position` beserta versi pasal yang disitasi; nomor versinya tampil di samping tulisan *Posisi hukum*. Jawaban baru untuk objek yang sama menjadi versi berikutnya tanpa menghapus versi lama.
+5. Dapat membaca jejak audit.
 
 ## Manajer Kepatuhan (`manager`, `manager2`)
 
@@ -49,6 +55,8 @@ Pemberi persetujuan di enam titik kendali:
 | 4 | Sign-off asesmen | Asesmen & sign-off → *Beri sign-off* |
 | 5 | Penutupan temuan | Temuan → *Tutup temuan* / *Tolak penutupan* / *Terima risiko* / *Buka kembali* |
 | 6 | Penerbitan laporan | Laporan → *Terbitkan* / *Tarik laporan* |
+
+Selain enam titik kendali di atas, Manajer memutuskan **relasi dokumen** (Korpus atau Perubahan regulasi → panel Relasi dokumen): **Setujui** mengubah status dokumen target secara otomatis (mis. *Diubah*/*Dicabut*), **Tolak** wajib alasan dan tidak mengubah status. Selama status *Analis sedang melakukan revisi*, persetujuan belum dapat diberikan.
 
 Pengembalian/penolakan selalu wajib alasan. Bila Anda pemilik tindakan atau pembuat objek, sistem menolak (gunakan `manager2`).
 
@@ -78,3 +86,5 @@ Ajukan pertanyaan; jawaban berupa kutipan pasal bersitasi. Bila korpus tidak mem
 | Perlu ditinjau | sumbernya berubah material atau profil berubah |
 | Risiko diterima | kesenjangan yang diterima, bukan diselesaikan |
 | Digantikan | ada versi/keputusan/laporan yang lebih baru; tetap dapat dibaca |
+| Menunggu Peninjau Hukum | dieskalasi ke Peninjau Hukum; belum dapat diajukan atau dipetakan |
+| Analis sedang melakukan revisi | relasi diminta direvisi oleh Peninjau Hukum; Manajer menunggu |

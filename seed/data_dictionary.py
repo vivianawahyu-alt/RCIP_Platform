@@ -16,6 +16,7 @@ TABLES = {
     "platform.approval": "Keputusan maker-checker pada 6 titik kendali; append-only; snapshot status objek.",
     "platform.ai_call_log": "Setiap panggilan AI: templat+versi, model, prompt, respons mentah, validasi skema, grounding.",
     "platform.config": "Parameter runtime teraudit (FR-GOV-007) dengan batas min/maks.",
+    "platform.copilot_review": "Permintaan tinjauan manusia atas jawaban copilot berkeyakinan rendah (FR-COP-005).",   
     "corpus.regulatory_source": "Otoritas/portal asal dokumen (OJK, BI, JDIH).",
     "corpus.document": "Identitas peraturan (nomor kanonik unik) dan status keberlakuannya.",
     "corpus.document_version": "Versi imutabel sebuah dokumen setelah PUBLISHED (trigger).",
@@ -36,6 +37,8 @@ TABLES = {
     "compliance.finding": "Temuan W12 dengan severity, pemilik, target, penutupan (titik kendali #5).",
     "compliance.remediation_action": "Tindakan remediasi dengan tenggat asli + riwayat perpanjangan.",
     "compliance.compliance_report": "Laporan W14; ISSUED imutabel (trigger), penerbit ≠ pembangkit (titik kendali #6).",
+    "compliance.legal_position": "Posisi hukum Peninjau Hukum (berversi) atas eskalasi perubahan, keberlakuan, atau kewajiban.",
+    "compliance.legal_position_citation": "Pasal yang disitasi posisi hukum, menunjuk versi pasal tertentu (provision_version).",
 }
 COLUMNS = {
     "state": "Status siklus hidup (kosakata tertutup, lihat CHECK).",
@@ -51,6 +54,13 @@ COLUMNS = {
     "payload": "Isi laporan yang dibekukan saat terbit (DRR-07).",
     "correlation_id": "ID korelasi permintaan (X-Correlation-Id).",
     "text_search": "Vektor pencarian full-text bahasa Indonesia (kolom terhitung).",
+    "legal_question": "Pertanyaan hukum saat dieskalasi ke Peninjau Hukum.",
+    "legal_position_id": "Posisi hukum yang dipakai (FK ke compliance.legal_position).",
+    "legal_position_version": "Versi posisi hukum yang dipakai saat keputusan dibuat.",
+    "subject_type": "Jenis objek yang dieskalasi: APPLICABILITY, OBLIGATION, atau CHANGE.",
+    "position_text": "Isi posisi hukum dari Peninjau Hukum.",
+    "legal_note": "Catatan hukum Peninjau Hukum pada usulan relasi.",
+    "reject_reason": "Alasan penolakan relasi oleh Manajer Kepatuhan.",
 }
 
 
@@ -90,7 +100,7 @@ def main() -> None:
         trg[t].append((n, e))
 
     out = ["# Data Dictionary RCIP", "",
-           "_Dibangkitkan otomatis oleh `python -m seed.data_dictionary` dari skema database (migrasi 001–003). "
+           "_Dibangkitkan otomatis oleh `python -m seed.data_dictionary` dari skema database (seluruh migrasi alembic). "
            "Jangan disunting manual; jalankan ulang setelah migrasi baru._", "",
            "Konvensi: semua ID UUID v4; waktu `timestamptz` (UTC); tanggal hukum `date`. Kolom berlabel **PK**/**FK** "
            "menunjukkan kunci; FK memakai `ON DELETE RESTRICT` sehingga rantai tidak dapat terputus.", "",

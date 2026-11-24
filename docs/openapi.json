@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "RCIP Platform",
+    "title": "Regulatory & Compliance Intelligence Platform (RCIP)",
     "description": "RCIP API — kontrak v1. Semua endpoint (kecuali /auth/login dan /health) memerlukan Bearer JWT.",
     "version": "1.0.0"
   },
@@ -80,6 +80,7 @@
           "platform"
         ],
         "summary": "List Users",
+        "description": "Direktori ringkas (id, username, peran) untuk pemilih pemilik/penanggung jawab di formulir.\nHanya akun AKTIF. Ini BUKAN layar administrasi pengguna — itu /admin/users (baris 'Administrasi pengguna dan peran').",
         "operationId": "list_users_api_v1_users_get",
         "responses": {
           "200": {
@@ -98,6 +99,179 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Admin List Users",
+        "operationId": "admin_list_users_api_v1_admin_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_list_"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Admin Create User",
+        "operationId": "admin_create_user_api_v1_admin_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/users/{uid}": {
+      "patch": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Admin Update User",
+        "operationId": "admin_update_user_api_v1_admin_users__uid__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Uid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Admin Delete User",
+        "description": "D (soft): menonaktifkan akun. Baris tetap ada agar audit_event/approval yang menunjuknya tetap sah.",
+        "operationId": "admin_delete_user_api_v1_admin_users__uid__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Uid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/audit": {
@@ -605,6 +779,201 @@
         }
       }
     },
+    "/api/v1/corpus/versions/{version_id}/file": {
+      "get": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Version File",
+        "description": "Berkas asli (PDF/TXT) sebuah versi, untuk dibandingkan dengan teks pasal (mis. memeriksa hasil OCR).",
+        "operationId": "version_file_api_v1_corpus_versions__version_id__file_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/documents/{doc_id}": {
+      "patch": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Update Document",
+        "description": "Perbaiki judul/jenis/penerbit kapan saja; nomor regulasi hanya selama belum pernah terbit\n(versi terbit sudah disitasi kewajiban & laporan dengan nomor itu).",
+        "operationId": "update_document_api_v1_corpus_documents__doc_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Get Document",
+        "operationId": "get_document_api_v1_corpus_documents__doc_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Delete Document",
+        "description": "Dokumen hanya dapat dihapus bila belum pernah terbit (semua versinya draf) dan tidak dirujuk relasi.",
+        "operationId": "delete_document_api_v1_corpus_documents__doc_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/corpus/versions/{version_id}/provisions": {
       "get": {
         "tags": [
@@ -709,6 +1078,54 @@
         }
       }
     },
+    "/api/v1/corpus/provision-versions/{pv_id}/confirm-text": {
+      "post": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Confirm Text",
+        "description": "FR-RKM-004: analis menyatakan teks hasil OCR sudah sesuai PDF aslinya (tanpa mengubah teks).",
+        "operationId": "confirm_text_api_v1_corpus_provision_versions__pv_id__confirm_text_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pv_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pv Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/corpus/versions/{version_id}/publish": {
       "post": {
         "tags": [
@@ -784,8 +1201,93 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
               "default": 10,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "instrument_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrument Type"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 1945
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "name": "issuer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Issuer"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
             }
           }
         ],
@@ -796,6 +1298,363 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ResponseWrapper_list_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/catalog": {
+      "get": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Catalog Search",
+        "operationId": "catalog_search_api_v1_corpus_catalog_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "instrument_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrument Type"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 1945
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "name": "issuer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Issuer"
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Label"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(newest|oldest|title)$",
+              "default": "newest",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/facets": {
+      "get": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Catalog Facets",
+        "operationId": "catalog_facets_api_v1_corpus_facets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/corpus/documents/{doc_id}/as-of": {
+      "get": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Document As Of",
+        "operationId": "document_as_of_api_v1_corpus_documents__doc_id__as_of_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/versions/{version_id}": {
+      "patch": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Update Version",
+        "description": "Perbaiki tanggal berlaku versi yang MASIH DRAF. Versi terbit imutabel: tarik lalu unggah ulang.",
+        "operationId": "update_version_api_v1_corpus_versions__version_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Delete Version",
+        "description": "Hanya versi DRAF yang dapat dihapus. Versi terbit imutabel (trigger DB) → gunakan 'tarik versi'.",
+        "operationId": "delete_version_api_v1_corpus_versions__version_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
                 }
               }
             }
@@ -857,6 +1716,297 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/corpus/versions/{version_id}/withdraw": {
+      "post": {
+        "tags": [
+          "corpus"
+        ],
+        "summary": "Withdraw Version",
+        "description": "Versi terbit ditarik (WITHDRAWN), bukan dihapus: tidak lagi dipakai pencarian/copilot/ekstraksi,\ntetapi teks dan jejaknya tetap tersimpan. Diblokir bila masih ada kewajiban yang menyitasinya.",
+        "operationId": "withdraw_version_api_v1_corpus_versions__version_id__withdraw_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/sources": {
+      "get": {
+        "tags": [
+          "corpus-sources"
+        ],
+        "summary": "List Sources",
+        "operationId": "list_sources_api_v1_corpus_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_list_"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "corpus-sources"
+        ],
+        "summary": "Create Source",
+        "operationId": "create_source_api_v1_corpus_sources_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/corpus/sources/{sid}/submit": {
+      "post": {
+        "tags": [
+          "corpus-sources"
+        ],
+        "summary": "Submit Source",
+        "description": "Ajukan ulang sumber yang dikembalikan (setelah diperbaiki).",
+        "operationId": "submit_source_api_v1_corpus_sources__sid__submit_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/sources/{sid}/decision": {
+      "post": {
+        "tags": [
+          "corpus-sources"
+        ],
+        "summary": "Decide Source",
+        "operationId": "decide_source_api_v1_corpus_sources__sid__decision_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/sources/{sid}/status": {
+      "post": {
+        "tags": [
+          "corpus-sources"
+        ],
+        "summary": "Change Status",
+        "description": "Tangguhkan / aktifkan kembali / pensiunkan. RETIRED memerlukan hak D (hapus lunak) pada registri.",
+        "operationId": "change_status_api_v1_corpus_sources__sid__status_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/corpus/changesets": {
@@ -1259,12 +2409,117 @@
         }
       }
     },
+    "/api/v1/corpus/relationships/{rid}": {
+      "patch": {
+        "tags": [
+          "corpus-review"
+        ],
+        "summary": "Update Relationship",
+        "description": "Relasi regulasi: hanya Analis yang menyunting, selama masih diajukan atau sedang direvisi.",
+        "operationId": "update_relationship_api_v1_corpus_relationships__rid__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelationshipUpdateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "corpus-review"
+        ],
+        "summary": "Delete Relationship",
+        "description": "Relasi regulasi: D = Analis. Hanya usulan (PROPOSED); relasi CONFIRMED sudah mengubah status dokumen → tidak boleh hilang.",
+        "operationId": "delete_relationship_api_v1_corpus_relationships__rid__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/corpus/relationships/{rid}/confirm": {
       "post": {
         "tags": [
           "corpus-review"
         ],
         "summary": "Confirm Relationship",
+        "description": "Konfirmasi relasi mengubah status dokumen (mis. REVOKED) → persetujuan Manajer Kepatuhan (baris\n'Perubahan status dokumen': Analis C/R/U, Manajer R/A). Pengonfirmasi tidak boleh sama dengan pengusul.",
         "operationId": "confirm_relationship_api_v1_corpus_relationships__rid__confirm_post",
         "security": [
           {
@@ -1282,6 +2537,238 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/relationships/{rid}/reject": {
+      "post": {
+        "tags": [
+          "corpus-review"
+        ],
+        "summary": "Reject Relationship",
+        "description": "Manajer menolak usulan relasi (alasan wajib); status dokumen tidak berubah. Pengusul tidak boleh memutuskan.",
+        "operationId": "reject_relationship_api_v1_corpus_relationships__rid__reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/relationships/{rid}/legal-note": {
+      "post": {
+        "tags": [
+          "corpus-review"
+        ],
+        "summary": "Legal Note Relationship",
+        "description": "Peninjau Hukum memberi catatan hukum tanpa mengubah relasi; Manajer tetap boleh memutuskan.",
+        "operationId": "legal_note_relationship_api_v1_corpus_relationships__rid__legal_note_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__corpus__review__NoteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/relationships/{rid}/request-revision": {
+      "post": {
+        "tags": [
+          "corpus-review"
+        ],
+        "summary": "Request Revision Relationship",
+        "description": "Peninjau Hukum minta revisi (catatan wajib): PROPOSED → REVISION_REQUESTED. Manajer menunggu revisi Analis.",
+        "operationId": "request_revision_relationship_api_v1_corpus_relationships__rid__request_revision_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__corpus__review__NoteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/corpus/relationships/{rid}/resubmit": {
+      "post": {
+        "tags": [
+          "corpus-review"
+        ],
+        "summary": "Resubmit Relationship",
+        "description": "Analis merevisi lalu mengajukan ulang: REVISION_REQUESTED → PROPOSED (kembali menunggu Manajer).",
+        "operationId": "resubmit_relationship_api_v1_corpus_relationships__rid__resubmit_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelationshipUpdateIn"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1814,6 +3301,149 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/compliance/obligations/{ob_id}/escalate": {
+      "post": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Escalate Obligation",
+        "description": "W8 (FRD Eksibit 33; TRD AOM.ESCALATED_TO_LEGAL): IN_VALIDATION → PENDING_LEGAL oleh Pejabat Kepatuhan, pertanyaan wajib.\nDraf AI yang belum dibuka lebih dulu dicatat AI_DRAFT → IN_VALIDATION (OBLIGATION_VALIDATION_STARTED).",
+        "operationId": "escalate_obligation_api_v1_compliance_obligations__ob_id__escalate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ob Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/compliance/obligations/{ob_id}/legal-answer": {
+      "post": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Legal Answer Obligation",
+        "description": "W8 (FRD Eksibit 33; TRD AOM.LEGAL_POSITION_RECORDED): PENDING_LEGAL → IN_VALIDATION oleh Peninjau Hukum.\nGuard legal_position_cited: posisi hukum wajib menyitasi ketentuan terbit yang teresolusi (TRD Eksibit 25).",
+        "operationId": "legal_answer_obligation_api_v1_compliance_obligations__ob_id__legal_answer_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ob_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ob Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegalAnswerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/compliance/legal-queue": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Legal Queue",
+        "description": "Antrian Peninjau Hukum: semua eskalasi yang menunggu posisi hukum, dikumpulkan di satu tempat\n(tinjauan perubahan ESCALATED, keputusan keberlakuan PENDING_LEGAL, kewajiban PENDING_LEGAL).",
+        "operationId": "legal_queue_api_v1_compliance_legal_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/compliance/obligations/{ob_id}/decision": {
@@ -3486,7 +5116,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NoteIn"
+                "$ref": "#/components/schemas/app__compliance__findings__NoteIn"
               }
             }
           }
@@ -4150,7 +5780,7 @@
           "reporting"
         ],
         "summary": "Trace",
-        "description": "Rantai: pasal → versi → dokumen → kewajiban → persetujuan → kontrol → asesmen → bukti → temuan → remediasi.",
+        "description": "Rantai: pasal → versi → dokumen → kewajiban → persetujuan → kontrol → asesmen → bukti → temuan → remediasi.\nMengikuti hak baca Obligation: Administrator tidak punya akses; Pemilik Bisnis/Kontrol hanya kewajiban miliknya.",
         "operationId": "trace_api_v1_compliance_trace_obligations__ob_id__get",
         "security": [
           {
@@ -4168,6 +5798,115 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/compliance/executive/posture": {
+      "get": {
+        "tags": [
+          "executive"
+        ],
+        "summary": "Posture",
+        "operationId": "posture_api_v1_compliance_executive_posture_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/compliance/owner/workspace": {
+      "get": {
+        "tags": [
+          "owner"
+        ],
+        "summary": "Workspace",
+        "operationId": "workspace_api_v1_compliance_owner_workspace_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/compliance/owner/findings/{fid}/plan": {
+      "post": {
+        "tags": [
+          "owner"
+        ],
+        "summary": "Save Plan",
+        "operationId": "save_plan_api_v1_compliance_owner_findings__fid__plan_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Fid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4238,6 +5977,185 @@
         ]
       }
     },
+    "/api/v1/copilot/interactions": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Interactions",
+        "description": "FR-COP-004: log interaksi (pertanyaan, pasal yang diambil, model, templat). review=pending → antrean tinjauan.",
+        "operationId": "interactions_api_v1_copilot_interactions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "review",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Review"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_list_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/copilot/interactions/{iid}/request-review": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Request Review",
+        "operationId": "request_review_api_v1_copilot_interactions__iid__request_review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "iid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Iid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/copilot/reviews/{rid}/verdict": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Verdict",
+        "operationId": "verdict_api_v1_copilot_reviews__rid__verdict_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Verdict"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWrapper_dict_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -4264,6 +6182,14 @@
           "answer": {
             "type": "string",
             "title": "Answer"
+          },
+          "citation_provision_version_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Citation Provision Version Ids",
+            "default": []
           }
         },
         "type": "object",
@@ -4394,14 +6320,14 @@
           },
           "origin_url": {
             "type": "string",
-            "title": "Origin Url",
-            "default": "upload://manual"
+            "title": "Origin Url"
           }
         },
         "type": "object",
         "required": [
           "file",
-          "effective_date"
+          "effective_date",
+          "origin_url"
         ],
         "title": "Body_upload_version_api_v1_corpus_documents__doc_id__versions_post"
       },
@@ -4579,6 +6505,30 @@
         ],
         "title": "ControlResult"
       },
+      "Decision": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "Decision"
+      },
       "DecisionDraftIn": {
         "properties": {
           "version_id": {
@@ -4706,6 +6656,17 @@
             "type": "string",
             "title": "Title Id"
           },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
           "source_category": {
             "type": "string",
             "title": "Source Category",
@@ -4715,6 +6676,52 @@
             "type": "string",
             "title": "Base Url",
             "default": "https://www.ojk.go.id"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "enacted_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enacted Date"
+          },
+          "promulgated_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promulgated Date"
+          },
+          "gazette_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gazette Ref"
           }
         },
         "type": "object",
@@ -4762,6 +6769,103 @@
         ],
         "title": "DocumentDetailDTO"
       },
+      "DocumentUpdate": {
+        "properties": {
+          "canonical_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Number"
+          },
+          "title_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Id"
+          },
+          "instrument_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Type"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "enacted_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enacted Date"
+          },
+          "promulgated_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promulgated Date"
+          },
+          "gazette_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gazette Ref"
+          }
+        },
+        "type": "object",
+        "title": "DocumentUpdate",
+        "description": "Ubah data dokumen. Nomor regulasi hanya boleh diubah selama belum ada versi yang pernah terbit.\nField katalog (tahun, tanggal, lembaran) boleh dikosongkan dengan mengirim null."
+      },
       "DocumentVersionDetailDTO": {
         "properties": {
           "id": {
@@ -4794,6 +6898,19 @@
           "state"
         ],
         "title": "DocumentVersionDetailDTO"
+      },
+      "EscalateIn": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "EscalateIn"
       },
       "EvidenceReviewIn": {
         "properties": {
@@ -4942,6 +7059,27 @@
         ],
         "title": "LabelIn"
       },
+      "LegalAnswerIn": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "citation_provision_version_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Citation Provision Version Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "title": "LegalAnswerIn"
+      },
       "LoginRequest": {
         "properties": {
           "username": {
@@ -4960,23 +7098,6 @@
         ],
         "title": "LoginRequest"
       },
-      "NoteIn": {
-        "properties": {
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "title": "NoteIn"
-      },
       "OperatingResult": {
         "type": "string",
         "enum": [
@@ -4987,6 +7108,36 @@
           "NOT_APPLICABLE"
         ],
         "title": "OperatingResult"
+      },
+      "PlanIn": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          },
+          "expected_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "description",
+          "due_date"
+        ],
+        "title": "PlanIn"
       },
       "ProfileIn": {
         "properties": {
@@ -5170,6 +7321,45 @@
           "relation_type"
         ],
         "title": "RelationshipIn"
+      },
+      "RelationshipUpdateIn": {
+        "properties": {
+          "relation_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation Type"
+          },
+          "citing_provision_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citing Provision Version Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "RelationshipUpdateIn"
       },
       "RemediationIn": {
         "properties": {
@@ -5444,6 +7634,23 @@
         "type": "object",
         "title": "ResponseWrapper[list]"
       },
+      "ReviewRequest": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "ReviewRequest"
+      },
       "RiskAcceptIn": {
         "properties": {
           "rationale": {
@@ -5520,6 +7727,99 @@
         ],
         "title": "SignoffIn"
       },
+      "SourceCategory": {
+        "type": "string",
+        "enum": [
+          "OJK",
+          "BANK_INDONESIA",
+          "PERATURAN_JDIH",
+          "PPATK",
+          "KEMENKEU",
+          "KOMDIGI",
+          "OTHER"
+        ],
+        "title": "SourceCategory"
+      },
+      "SourceIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "$ref": "#/components/schemas/SourceCategory"
+          },
+          "issuer_name": {
+            "type": "string",
+            "title": "Issuer Name"
+          },
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "url_allow_list": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Url Allow List",
+            "default": []
+          },
+          "permitted_use_statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permitted Use Statement"
+          },
+          "citation_requirement_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citation Requirement Text"
+          },
+          "submit": {
+            "type": "boolean",
+            "title": "Submit",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "category",
+          "issuer_name",
+          "base_url"
+        ],
+        "title": "SourceIn"
+      },
+      "StatusChange": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "StatusChange"
+      },
       "SuggestIn": {
         "properties": {
           "version_id": {
@@ -5543,6 +7843,84 @@
           "version_id"
         ],
         "title": "SuggestIn"
+      },
+      "UserCreateIn": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "email",
+          "password",
+          "role"
+        ],
+        "title": "UserCreateIn"
+      },
+      "UserUpdateIn": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "UserUpdateIn"
       },
       "ValidateChangeIn": {
         "properties": {
@@ -5641,6 +8019,88 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Verdict": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "corrected_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict"
+        ],
+        "title": "Verdict"
+      },
+      "VersionUpdate": {
+        "properties": {
+          "effective_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Effective Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "effective_date"
+        ],
+        "title": "VersionUpdate"
+      },
+      "WithdrawRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "WithdrawRequest",
+        "description": "Isi body untuk tarik versi: alasan wajib (dicatat di jejak audit)."
+      },
+      "app__compliance__findings__NoteIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "NoteIn"
+      },
+      "app__corpus__review__NoteIn": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "NoteIn"
       }
     },
     "securitySchemes": {

@@ -19,12 +19,11 @@ Login: `analyst` · `officer` · `owner` · `legal` · `manager` · `auditor` ·
 
 ## Memperbarui instalasi yang sudah berjalan (data dipertahankan)
 ```bash
-cd /d/CapStone/rcip_new
-docker exec rcip_postgres pg_dump -U rcip -d rcip_db > rcip_backup.sql   # cadangan dulu
-docker compose up -d --build
-docker compose exec api alembic upgrade head        # menerapkan migrasi 002 & 003
-docker compose restart api worker
-docker compose exec api python -m seed.validate     # cek invarian data lama
+cd /d/CapStone/RCIP_Platform
+git checkout main
+git pull
+docker compose up -d                                # --build bila requirements.txt / Dockerfile berubah
+docker compose restart api                          # migrasi baru & impor korpus tim berjalan saat api menyala
 cd web && npm install && npm run dev
 ```
 Jangan jalankan `docker compose down -v` (menghapus database). Bila `npm run dev` gagal karena izin/esbuild, hapus `web/node_modules` lalu `npm install`.
