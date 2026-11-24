@@ -23,8 +23,9 @@ export function Kewajiban({ ctx }: { ctx: Ctx }) {
   const [cites, setCites] = useState<Record<string, Cited[]>>({});
   const [trace, setTrace] = useState<any>(null);
   const { run, busy } = useAction(ctx.notify, reload);
-  const officer = can(ctx.me.role, "obligation_validate"), manager = can(ctx.me.role, "obligation_approve");
   const legal = ctx.me.role === "LEGAL_REVIEWER";
+  // validasi, eskalasi, dan buka ulang = alur Pejabat Kepatuhan; Peninjau Hukum hanya memberi posisi hukum
+  const officer = can(ctx.me.role, "obligation_validate") && !legal, manager = can(ctx.me.role, "obligation_approve");
   const owners = (users || []).filter(u => !["SYSTEM_ADMINISTRATOR", "INTERNAL_AUDITOR", "EXECUTIVE"].includes(u.role));
   const defOwner = owners.find(u => u.username === "owner")?.id || "";
   const shown = (obs || []).filter(o => filter === "Semua" || o.state === filter);
@@ -43,7 +44,7 @@ export function Kewajiban({ ctx }: { ctx: Ctx }) {
       {o.low_confidence && ["AI_DRAFT", "IN_VALIDATION"].includes(o.state) && <span className="badge amber">Keyakinan rendah · wajib ditinjau manual</span>}
       {o.state === "REVIEW_REQUIRED" && <div className="notice error" style={{ marginTop: 8 }}><span>Pasal sumber berubah secara material. Kewajiban tetap tercatat sampai ditinjau ulang; buka kembali untuk memvalidasi terhadap versi terbaru.</span></div>}
       {o.reopen_reason && o.state !== "ACTIVE" && <p className="small">Dibuka kembali: {o.reopen_reason}</p>}
-      {o.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {o.legal_question}{o.legal_answer && <><br />Posisi hukum{o.legal_reviewer ? ` (${o.legal_reviewer})` : ""}: {o.legal_answer}</>}</p>}
+      {o.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {o.legal_question}{o.legal_answer && <><br />Posisi hukum{o.legal_position_version ? ` v${o.legal_position_version}` : ""}{o.legal_reviewer ? ` (${o.legal_reviewer})` : ""}: {o.legal_answer}</>}</p>}
       <div className="row small muted">{o.deadline && <span>Tenggat: {o.deadline}</span>}{o.frequency && <span>Frekuensi: {o.frequency}</span>}
         <span>Pemilik: {o.owner || "belum ditetapkan"}</span>{o.validator && <span>Validator: {o.validator}</span>}{o.approver && <span>Penyetuju: {o.approver}</span>}</div>
 

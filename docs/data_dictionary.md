@@ -1,6 +1,6 @@
 # Data Dictionary RCIP
 
-_Dibangkitkan otomatis oleh `python -m seed.data_dictionary` dari skema database (migrasi 001–003). Jangan disunting manual; jalankan ulang setelah migrasi baru._
+_Dibangkitkan otomatis oleh `python -m seed.data_dictionary` dari skema database (seluruh migrasi alembic). Jangan disunting manual; jalankan ulang setelah migrasi baru._
 
 Konvensi: semua ID UUID v4; waktu `timestamptz` (UTC); tanggal hukum `date`. Kolom berlabel **PK**/**FK** menunjukkan kunci; FK memakai `ON DELETE RESTRICT` sehingga rantai tidak dapat terputus.
 
@@ -12,25 +12,28 @@ Konvensi: semua ID UUID v4; waktu `timestamptz` (UTC); tanggal hukum `date`. Kol
 | `compliance.control` | Kontrol mitigasi beserta pemiliknya. | 36 |
 | `compliance.evidence` | Bukti kontrol / bukti penutupan tindakan; ACCEPTED imutabel (trigger). | 62 |
 | `compliance.finding` | Temuan W12 dengan severity, pemilik, target, penutupan (titik kendali #5). | 15 |
+| `compliance.legal_position` | Posisi hukum Peninjau Hukum (berversi) atas eskalasi perubahan, keberlakuan, atau kewajiban. | 2 |
+| `compliance.legal_position_citation` | Pasal yang disitasi posisi hukum, menunjuk versi pasal tertentu (provision_version). | 1 |
 | `compliance.obligation` | Kewajiban terstruktur; AI_DRAFT tidak pernah dihitung/dipetakan (ditegakkan DB). | 48 |
 | `compliance.obligation_control_map` | Pemetaan banyak-ke-banyak kewajiban ↔ kontrol (trigger memblokir draf AI). | 36 |
 | `compliance.organisation_profile` | Profil organisasi sintetis berversi; dasar keputusan keberlakuan. | 1 |
 | `compliance.remediation_action` | Tindakan remediasi dengan tenggat asli + riwayat perpanjangan. | 12 |
 | `compliance.risk` | Risiko ketidakpatuhan per kewajiban. | 36 |
-| `corpus.change` | Perubahan per ketentuan + status reviu W5 (titik kendali #1) dan permukaan dampak. | 8 |
-| `corpus.change_set` | Perbandingan dua versi dokumen. | 6 |
-| `corpus.document` | Identitas peraturan (nomor kanonik unik) dan status keberlakuannya. | 30 |
-| `corpus.document_version` | Versi imutabel sebuah dokumen setelah PUBLISHED (trigger). | 36 |
-| `corpus.provision` | Identitas ketentuan (Pasal) lintas versi. | 83 |
-| `corpus.provision_version` | Teks ketentuan pada versi tertentu; target semua sitasi; imutabel bila versinya terbit. | 110 |
+| `corpus.change` | Perubahan per ketentuan + status reviu W5 (titik kendali #1) dan permukaan dampak. | 10 |
+| `corpus.change_set` | Perbandingan dua versi dokumen. | 7 |
+| `corpus.document` | Identitas peraturan (nomor kanonik unik) dan status keberlakuannya. | 35 |
+| `corpus.document_version` | Versi imutabel sebuah dokumen setelah PUBLISHED (trigger). | 39 |
+| `corpus.provision` | Identitas ketentuan (Pasal) lintas versi. | 133 |
+| `corpus.provision_version` | Teks ketentuan pada versi tertentu; target semua sitasi; imutabel bila versinya terbit. | 160 |
 | `corpus.regulatory_source` | Otoritas/portal asal dokumen (OJK, BI, JDIH). | 3 |
-| `corpus.relationship` | Silsilah antardokumen (mengubah/mencabut/merujuk) dengan sitasi penetap. | 1 |
-| `corpus.taxonomy_label` | Label taksonomi terkendali (tema, populasi) — saran aturan dikonfirmasi manusia. | 39 |
+| `corpus.relationship` | Silsilah antardokumen (mengubah/mencabut/merujuk) dengan sitasi penetap. | 5 |
+| `corpus.taxonomy_label` | Label taksonomi terkendali (tema, populasi) — saran aturan dikonfirmasi manusia. | 40 |
 | `platform.ai_call_log` | Setiap panggilan AI: templat+versi, model, prompt, respons mentah, validasi skema, grounding. | 55 |
 | `platform.app_user` | Akun pengguna dan perannya (8 persona + tambahan sintetis). Password PBKDF2. | 13 |
 | `platform.approval` | Keputusan maker-checker pada 6 titik kendali; append-only; snapshot status objek. | 94 |
-| `platform.audit_event` | Jejak audit append-only (trigger menolak UPDATE/DELETE). Setiap transisi status. | 114 |
-| `platform.config` | Parameter runtime teraudit (FR-GOV-007) dengan batas min/maks. | 9 |
+| `platform.audit_event` | Jejak audit append-only (trigger menolak UPDATE/DELETE). Setiap transisi status. | 146 |
+| `platform.config` | Parameter runtime teraudit (FR-GOV-007) dengan batas min/maks. | 10 |
+| `platform.copilot_review` | Permintaan tinjauan manusia atas jawaban copilot berkeyakinan rendah (FR-COP-005). | 0 |
 | `platform.outbox` | Event domain (transactional outbox) untuk pemrosesan asinkron oleh worker. | 0 |
 
 ## `compliance.applicability_decision`
@@ -51,9 +54,7 @@ Keputusan keberlakuan W7 (titik kendali #2) dengan sitasi & snapshot profil.
 | `state` | text | tidak |  | Status siklus hidup (kosakata tertutup, lihat CHECK). Default: `'IN_ASSESSMENT'::text`. |
 | `cited_provision_version_ids` | jsonb | tidak |  | Default: `'[]'::jsonb`. |
 | `scope_provision_version_ids` | jsonb | tidak |  | Default: `'[]'::jsonb`. |
-| `legal_question` | text | ya |  |  |
-| `legal_answer` | text | ya |  |  |
-| `legal_reviewer_id` | uuid | ya | FK → `platform.app_user` |  |
+| `legal_question` | text | ya |  | Pertanyaan hukum saat dieskalasi ke Peninjau Hukum. |
 | `submitted_at` | timestamp with time zone | ya |  |  |
 | `decided_at` | timestamp with time zone | ya |  |  |
 | `return_reason` | text | ya |  |  |
@@ -61,6 +62,8 @@ Keputusan keberlakuan W7 (titik kendali #2) dengan sitasi & snapshot profil.
 | `review_target_date` | date | ya |  |  |
 | `suggested_value` | text | ya |  |  |
 | `superseded_by` | uuid | ya | FK → `compliance.applicability_decision` |  |
+| `legal_position_id` | uuid | ya | FK → `compliance.legal_position` | Posisi hukum yang dipakai (FK ke compliance.legal_position). |
+| `legal_position_version` | integer | ya |  | Versi posisi hukum yang dipakai saat keputusan dibuat. |
 
 Aturan (CHECK):
 - `ck_applicability_sod`: `CHECK (((approver_id IS NULL) OR (approver_id <> maker_id)))`
@@ -161,7 +164,7 @@ Aturan (CHECK):
 - `ck_evidence_target`: `CHECK (((control_id IS NOT NULL) OR (remediation_action_id IS NOT NULL)))`
 
 Trigger:
-- `trg_evidence_immutable` (DELETE/UPDATE)
+- `trg_evidence_immutable` (UPDATE/DELETE)
 
 ## `compliance.finding`
 
@@ -199,6 +202,33 @@ Aturan (CHECK):
 - `ck_finding_severity`: `CHECK ((severity = ANY (ARRAY['CRITICAL'::text, 'HIGH'::text, 'MEDIUM'::text, 'LOW'::text])))`
 - `ck_finding_state`: `CHECK ((state = ANY (ARRAY['OPEN'::text, 'ACTION_PLANNED'::text, 'IN_REMEDIATION'::text, 'PENDING_CLOSURE_VALIDATION'::text, 'CLOSED'::text, 'RISK_ACCEPTED'::text, 'REVIEW_REQUIRED'::text])))`
 
+## `compliance.legal_position`
+
+Posisi hukum Peninjau Hukum (berversi) atas eskalasi perubahan, keberlakuan, atau kewajiban.
+
+| Kolom | Tipe | Null | Kunci | Keterangan |
+|---|---|---|---|---|
+| `id` | uuid | tidak | PK |  |
+| `subject_type` | text | tidak |  | Jenis objek yang dieskalasi: APPLICABILITY, OBLIGATION, atau CHANGE. |
+| `subject_id` | uuid | tidak |  |  |
+| `version` | integer | tidak |  |  |
+| `question` | text | ya |  |  |
+| `position_text` | text | tidak |  | Isi posisi hukum dari Peninjau Hukum. |
+| `reviewer_id` | uuid | ya | FK → `platform.app_user` |  |
+| `created_at` | timestamp with time zone | tidak |  | Default: `now()`. |
+
+Aturan (CHECK):
+- `legal_position_subject_type_check`: `CHECK ((subject_type = ANY (ARRAY['APPLICABILITY'::text, 'OBLIGATION'::text, 'CHANGE'::text])))`
+
+## `compliance.legal_position_citation`
+
+Pasal yang disitasi posisi hukum, menunjuk versi pasal tertentu (provision_version).
+
+| Kolom | Tipe | Null | Kunci | Keterangan |
+|---|---|---|---|---|
+| `legal_position_id` | uuid | tidak | PK | Posisi hukum yang dipakai (FK ke compliance.legal_position). |
+| `provision_version_id` | uuid | tidak | PK |  |
+
 ## `compliance.obligation`
 
 Kewajiban terstruktur; AI_DRAFT tidak pernah dihitung/dipetakan (ditegakkan DB).
@@ -227,6 +257,9 @@ Kewajiban terstruktur; AI_DRAFT tidak pernah dihitung/dipetakan (ditegakkan DB).
 | `low_confidence` | boolean | tidak |  | Keyakinan AI di bawah ai.confidence_floor; wajib konfirmasi tinjauan manual. Default: `false`. |
 | `low_confidence_reviewed_by` | uuid | ya | FK → `platform.app_user` |  |
 | `reopen_reason` | text | ya |  |  |
+| `legal_question` | text | ya |  | Pertanyaan hukum saat dieskalasi ke Peninjau Hukum. |
+| `legal_position_id` | uuid | ya | FK → `compliance.legal_position` | Posisi hukum yang dipakai (FK ke compliance.legal_position). |
+| `legal_position_version` | integer | ya |  | Versi posisi hukum yang dipakai saat keputusan dibuat. |
 
 Aturan (CHECK):
 - `ck_active_needs_owner`: `CHECK (((state <> ALL (ARRAY['ACTIVE'::text, 'PENDING_APPROVAL'::text])) OR (owner_id IS NOT NULL)))`
@@ -312,14 +345,15 @@ Perubahan per ketentuan + status reviu W5 (titik kendali #1) dan permukaan dampa
 | `semantic_type` | text | ya |  |  |
 | `analyst_material` | boolean | ya |  |  |
 | `review_reason` | text | ya |  |  |
-| `legal_question` | text | ya |  |  |
-| `legal_answer` | text | ya |  |  |
+| `legal_question` | text | ya |  | Pertanyaan hukum saat dieskalasi ke Peninjau Hukum. |
 | `validated_by` | uuid | ya | FK → `platform.app_user` |  |
 | `validated_at` | timestamp with time zone | ya |  |  |
 | `confirmed_by` | uuid | ya | FK → `platform.app_user` |  |
 | `confirmed_at` | timestamp with time zone | ya |  |  |
 | `return_reason` | text | ya |  |  |
 | `impact` | jsonb | tidak |  | Daftar objek hilir yang ditandai saat perubahan material dikonfirmasi. Default: `'{}'::jsonb`. |
+| `legal_position_id` | uuid | ya | FK → `compliance.legal_position` | Posisi hukum yang dipakai (FK ke compliance.legal_position). |
+| `legal_position_version` | integer | ya |  | Versi posisi hukum yang dipakai saat keputusan dibuat. |
 
 Aturan (CHECK):
 - `ck_change_confirm_sod`: `CHECK (((confirmed_by IS NULL) OR (validated_by IS NULL) OR (confirmed_by <> validated_by)))`
@@ -350,6 +384,14 @@ Identitas peraturan (nomor kanonik unik) dan status keberlakuannya.
 | `issuer` | text | tidak |  |  |
 | `title_id` | text | tidak |  |  |
 | `status` | text | tidak |  | Default: `'DRAFT'::text`. |
+| `created_at` | timestamp with time zone | tidak |  | Default: `now()`. |
+| `year` | integer | ya |  |  |
+| `enacted_date` | date | ya |  |  |
+| `promulgated_date` | date | ya |  |  |
+| `gazette_ref` | text | ya |  |  |
+
+Aturan (CHECK):
+- `ck_document_year`: `CHECK (((year IS NULL) OR ((year >= 1945) AND (year <= 2100))))`
 
 ## `corpus.document_version`
 
@@ -366,9 +408,19 @@ Versi imutabel sebuah dokumen setelah PUBLISHED (trigger).
 | `effective_date` | date | tidak |  |  |
 | `state` | text | tidak |  | Status siklus hidup (kosakata tertutup, lihat CHECK). Default: `'PARSING'::text`. |
 | `is_partial` | boolean | tidak |  | Default: `false`. |
+| `extraction_method` | text | tidak |  | Default: `'TEXT_LAYER'::text`. |
+| `ocr_pages` | jsonb | tidak |  | Default: `'[]'::jsonb`. |
+| `file_name` | text | ya |  |  |
+| `mime_type` | text | ya |  |  |
+| `size_bytes` | bigint | ya |  |  |
+| `uploaded_by` | uuid | ya | FK → `platform.app_user` |  |
+
+Aturan (CHECK):
+- `ck_dv_extraction_method`: `CHECK ((extraction_method = ANY (ARRAY['TEXT_LAYER'::text, 'OCR'::text, 'PLAIN_TEXT'::text])))`
 
 Trigger:
-- `trg_dv_frozen` (DELETE/UPDATE)
+- `trg_dv_frozen` (UPDATE/DELETE)
+- `trg_dv_unconfirmed_ocr` (UPDATE)
 
 ## `corpus.provision`
 
@@ -397,6 +449,7 @@ Teks ketentuan pada versi tertentu; target semua sitasi; imutabel bila versinya 
 | `segmentation_confidence` | numeric | tidak |  | Default: `0.85`. |
 | `corrected_by_human` | boolean | tidak |  | Default: `false`. |
 | `text_search` | tsvector | ya |  | Vektor pencarian full-text bahasa Indonesia (kolom terhitung). |
+| `low_confidence_text` | boolean | tidak |  | Default: `false`. |
 
 Trigger:
 - `trg_pv_frozen` (DELETE/UPDATE)
@@ -414,6 +467,19 @@ Otoritas/portal asal dokumen (OJK, BI, JDIH).
 | `base_url` | text | tidak |  |  |
 | `permitted_use_statement` | text | ya |  |  |
 | `status` | text | tidak |  | Default: `'DRAFT'::text`. |
+| `url_allow_list` | jsonb | tidak |  | Default: `'[]'::jsonb`. |
+| `citation_requirement_text` | text | ya |  |  |
+| `created_by` | uuid | ya | FK → `platform.app_user` |  |
+| `created_at` | timestamp with time zone | tidak |  | Default: `now()`. |
+| `submitted_by` | uuid | ya | FK → `platform.app_user` |  |
+| `approved_by` | uuid | ya | FK → `platform.app_user` |  |
+| `approved_at` | timestamp with time zone | ya |  |  |
+| `return_reason` | text | ya |  |  |
+
+Aturan (CHECK):
+- `ck_source_active_has_use`: `CHECK (((status <> 'ACTIVE'::text) OR (COALESCE(btrim(permitted_use_statement), ''::text) <> ''::text)))`
+- `ck_source_approval_sod`: `CHECK (((approved_by IS NULL) OR (submitted_by IS NULL) OR (approved_by <> submitted_by)))`
+- `ck_source_status`: `CHECK ((status = ANY (ARRAY['DRAFT'::text, 'PENDING_USE_REVIEW'::text, 'ACTIVE'::text, 'SUSPENDED'::text, 'RETIRED'::text])))`
 
 ## `corpus.relationship`
 
@@ -431,11 +497,15 @@ Silsilah antardokumen (mengubah/mencabut/merujuk) dengan sitasi penetap.
 | `proposed_by` | uuid | ya | FK → `platform.app_user` |  |
 | `confirmed_by` | uuid | ya | FK → `platform.app_user` |  |
 | `created_at` | timestamp with time zone | tidak |  | Default: `now()`. |
+| `legal_note` | text | ya |  | Catatan hukum Peninjau Hukum pada usulan relasi. |
+| `legal_reviewer_id` | uuid | ya | FK → `platform.app_user` |  |
+| `reject_reason` | text | ya |  | Alasan penolakan relasi oleh Manajer Kepatuhan. |
+| `rejected_by` | uuid | ya | FK → `platform.app_user` |  |
 
 Aturan (CHECK):
 - `ck_relationship_not_self`: `CHECK ((source_document_id <> target_document_id))`
 - `relationship_relation_type_check`: `CHECK ((relation_type = ANY (ARRAY['AMENDS'::text, 'REVOKES'::text, 'PARTIALLY_REVOKES'::text, 'REFERS_TO'::text, 'IMPLEMENTS'::text])))`
-- `relationship_state_check`: `CHECK ((state = ANY (ARRAY['PROPOSED'::text, 'CONFIRMED'::text, 'REJECTED'::text])))`
+- `relationship_state_check`: `CHECK ((state = ANY (ARRAY['PROPOSED'::text, 'REVISION_REQUESTED'::text, 'CONFIRMED'::text, 'REJECTED'::text])))`
 
 ## `corpus.taxonomy_label`
 
@@ -473,6 +543,11 @@ Setiap panggilan AI: templat+versi, model, prompt, respons mentah, validasi skem
 | `grounding_passed` | boolean | tidak |  |  |
 | `confidence` | numeric | ya |  |  |
 | `created_at` | timestamp with time zone | tidak |  | Default: `now()`. |
+| `user_id` | uuid | ya | FK → `platform.app_user` |  |
+| `presented_state` | text | ya |  |  |
+
+Trigger:
+- `trg_ai_log_append_only` (UPDATE/DELETE)
 
 ## `platform.app_user`
 
@@ -486,6 +561,7 @@ Akun pengguna dan perannya (8 persona + tambahan sintetis). Password PBKDF2.
 | `hashed_password` | text | tidak |  |  |
 | `role` | text | tidak |  |  |
 | `created_at` | timestamp with time zone | tidak |  | Default: `now()`. |
+| `is_active` | boolean | tidak |  | Default: `true`. |
 
 ## `platform.approval`
 
@@ -510,7 +586,7 @@ Aturan (CHECK):
 - `ck_sod_maker`: `CHECK ((checker_id <> maker_id))`
 
 Trigger:
-- `trg_approval_append_only` (UPDATE/DELETE)
+- `trg_approval_append_only` (DELETE/UPDATE)
 
 ## `platform.audit_event`
 
@@ -549,6 +625,29 @@ Parameter runtime teraudit (FR-GOV-007) dengan batas min/maks.
 
 Aturan (CHECK):
 - `ck_config_bounds`: `CHECK (((value >= min_value) AND (value <= max_value)))`
+
+## `platform.copilot_review`
+
+Permintaan tinjauan manusia atas jawaban copilot berkeyakinan rendah (FR-COP-005).
+
+| Kolom | Tipe | Null | Kunci | Keterangan |
+|---|---|---|---|---|
+| `id` | uuid | tidak | PK |  |
+| `interaction_id` | uuid | tidak | FK → `platform.ai_call_log` |  |
+| `state` | text | tidak |  | Status siklus hidup (kosakata tertutup, lihat CHECK). Default: `'PENDING'::text`. |
+| `requested_by` | uuid | tidak | FK → `platform.app_user` |  |
+| `requested_at` | timestamp with time zone | tidak |  | Default: `now()`. |
+| `request_note` | text | ya |  |  |
+| `reviewer_id` | uuid | ya | FK → `platform.app_user` |  |
+| `verdict` | text | ya |  |  |
+| `corrected_text` | text | ya |  |  |
+| `reviewed_at` | timestamp with time zone | ya |  |  |
+
+Aturan (CHECK):
+- `ck_copilot_corrected_text`: `CHECK (((verdict IS DISTINCT FROM 'CORRECTED'::text) OR (COALESCE(btrim(corrected_text), ''::text) <> ''::text)))`
+- `ck_copilot_review_sod`: `CHECK (((reviewer_id IS NULL) OR (reviewer_id <> requested_by)))`
+- `copilot_review_state_check`: `CHECK ((state = ANY (ARRAY['PENDING'::text, 'COMPLETED'::text])))`
+- `copilot_review_verdict_check`: `CHECK ((verdict = ANY (ARRAY['CONFIRMED'::text, 'CORRECTED'::text, 'REJECTED'::text])))`
 
 ## `platform.outbox`
 

@@ -187,7 +187,7 @@ def _ai_meta(db: Session, call_id):
 
 @router.post("/obligations/{ob_id}/reopen", response_model=ResponseWrapper[dict])
 def reopen_obligation(ob_id: str, body: ReopenIn, db: Session = Depends(get_db),
-                      user: AppUser = Depends(require("obligation", "U"))):
+                        user: AppUser = Depends(require("obligation", "U", only=[AppRole.COMPLIANCE_OFFICER]))):
     """W8: REVIEW_REQUIRED → IN_VALIDATION. Opsional: arahkan sitasi ke ketentuan yang sama pada versi terbit terbaru."""
     ob = _get(db, Obligation, ob_id)
     if ob.state != ObligationState.REVIEW_REQUIRED.value:
@@ -268,6 +268,40 @@ def legal_answer_obligation(ob_id: str, body: LegalAnswerIn, db: Session = Depen
                  "citation_provision_version_ids": body.citation_provision_version_ids})    
     db.commit()
     return ResponseWrapper(data={"id": str(ob.id), "state": ob.state})
+
+@router.get("/legal-queue", response_model=ResponseWrapper[dict])
+def legal_queue(db: Session = Depends(get_db),
+                user: AppUser = Depends(require("change_review", "R", only=[AppRole.LEGAL_REVIEWER]))):
+    """Antrian Peninjau Hukum: semua eskalasi yang menunggu posisi hukum, dikumpulkan di satu tempat
+    (tinjauan perubahan ESCALATED, keputusan keberlakuan PENDING_LEGAL, kewajiban PENDING_LEGAL)."""
+    from app.compliance.models import ApplicabilityDecision
+    from app.corpus.models import Change, ChangeSet
+    docs = {d.id: d.canonical_number for d in db.scalars(select(Document))}
+    changes = []
+    for c, label, cs in db.execute(select(Change, Provision.number_label, ChangeSet)
+                                   .join(Provision, Provision.id == Change.provision_id)
+                                   .join(ChangeSet, ChangeSet.id == Change.change_set_id)
+                                   .where(Change.review_state == "ESCALATED")).all():
+        bv, nv = db.get(DocumentVersion, cs.base_version_id), db.get(DocumentVersion, cs.new_version_id)
+        changes.append({"id": str(c.id), "change_set_id": str(cs.id), "document": docs.get(nv.document_id),
+                        "versions": f"v{bv.version_number} → v{nv.version_number}", "provision": label,
+                        "question": c.legal_question})
+    applicability = []
+    for d in db.scalars(select(ApplicabilityDecision).where(ApplicabilityDecision.state == "PENDING_LEGAL")):
+        dv = db.get(DocumentVersion, d.target_version_id)
+        applicability.append({"id": str(d.id), "document": docs.get(dv.document_id),
+                              "version_number": dv.version_number, "question": d.legal_question})
+    obligations = []
+    for o, p, doc in db.execute(select(Obligation, Provision, Document)
+                                .join(ProvisionVersion, ProvisionVersion.id == Obligation.primary_citation_id)
+                                .join(Provision, Provision.id == ProvisionVersion.provision_id)
+                                .join(DocumentVersion, DocumentVersion.id == ProvisionVersion.document_version_id)
+                                .join(Document, Document.id == DocumentVersion.document_id)
+                                .where(Obligation.state == ObligationState.PENDING_LEGAL.value)).all():
+        obligations.append({"id": str(o.id), "summary": o.plain_language_summary,
+                            "citation": f"{doc.canonical_number} {p.number_label}", "question": o.legal_question})
+    return ResponseWrapper(data={"changes": changes, "applicability": applicability, "obligations": obligations})
+
 
 @router.post("/obligations/{ob_id}/decision", response_model=ResponseWrapper[dict])
 def decide(ob_id: str, body: DecisionIn, db: Session = Depends(get_db),

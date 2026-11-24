@@ -254,6 +254,8 @@ def test_legal_cannot_validate_obligation(client):
     ob = client.post(f"{P}/compliance/obligations/extract", headers=o, json={"provision_version_id": pv1}).json()["data"]["obligation_ids"][0]
     r = client.post(f"{P}/compliance/obligations/{ob}/validate", headers=legal, json={"owner_id": uid(client, o, "owner"), "low_confidence_reviewed": True})
     assert r.status_code == 403
+    # buka ulang kewajiban (REVIEW_REQUIRED → IN_VALIDATION) juga hanya Pejabat Kepatuhan
+    assert client.post(f"{P}/compliance/obligations/{ob}/reopen", headers=legal, json={"reason": "x"}).status_code == 403
 
 
 def test_obligation_escalation_to_legal(client):
@@ -302,3 +304,20 @@ def test_obligation_escalation_to_legal(client):
     # alur normal berlanjut: validasi → persetujuan Manajer
     assert client.post(f"{P}/compliance/obligations/{ob}/validate", headers=o, json={"owner_id": owner, "low_confidence_reviewed": True}).json()["data"]["state"] == "PENDING_APPROVAL"
     assert client.post(f"{P}/compliance/obligations/{ob}/decision", headers=m, json={"outcome": "APPROVED"}).json()["data"]["state"] == "ACTIVE"
+
+
+def test_legal_queue_lists_pending_escalations(client):
+    """Antrian hukum: kewajiban yang dieskalasi muncul di antrian legal dan hilang setelah dijawab; hanya legal yang bisa membuka."""
+    a, o, legal = login(client, "analyst"), login(client, "officer"), login(client, "legal")
+    doc, (v1, _) = _doc_with_two_versions(client, "Pasal 1\nBank wajib melaporkan insiden paling lambat 24 (dua puluh empat) jam.",
+                                          "Pasal 1\nBank wajib melaporkan insiden paling lambat 24 (dua puluh empat) jam.")
+    pv1 = client.get(f"{P}/corpus/versions/{v1}/provisions", headers=a).json()["data"][0]["provision_version_id"]
+    approve_applicability(client, v1, [pv1])
+    ob = client.post(f"{P}/compliance/obligations/extract", headers=o, json={"provision_version_id": pv1}).json()["data"]["obligation_ids"][0]
+    queue = f"{P}/compliance/legal-queue"
+    assert client.get(queue, headers=o).status_code == 403
+    client.post(f"{P}/compliance/obligations/{ob}/escalate", headers=o, json={"question": "Berlaku untuk cabang?"})
+    assert ob in [x["id"] for x in client.get(queue, headers=legal).json()["data"]["obligations"]]
+    client.post(f"{P}/compliance/obligations/{ob}/legal-answer", headers=legal,
+                json={"answer": "Berlaku", "citation_provision_version_ids": [pv1]})
+    assert ob not in [x["id"] for x in client.get(queue, headers=legal).json()["data"]["obligations"]]   

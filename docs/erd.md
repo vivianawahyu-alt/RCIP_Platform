@@ -83,6 +83,20 @@ erDiagram
         uuid assessment_id FK
         uuid owner_id FK
     }
+    compliance__legal_position {
+        uuid id PK
+        text subject_type
+        uuid subject_id
+        integer version
+        text question
+        text position_text
+        uuid reviewer_id FK
+        timestamp_with_time_zone created_at
+    }
+    compliance__legal_position_citation {
+        uuid legal_position_id PK
+        uuid provision_version_id PK
+    }
     compliance__obligation {
         uuid id PK
         uuid applicability_decision_id FK
@@ -158,6 +172,11 @@ erDiagram
         text issuer
         text title_id
         text status
+        timestamp_with_time_zone created_at
+        integer year
+        date enacted_date
+        date promulgated_date
+        text gazette_ref
     }
     corpus__document_version {
         uuid id PK
@@ -169,6 +188,9 @@ erDiagram
         date effective_date
         text state
         boolean is_partial
+        text extraction_method
+        jsonb ocr_pages
+        text file_name
     }
     corpus__provision {
         uuid id PK
@@ -187,6 +209,7 @@ erDiagram
         numeric segmentation_confidence
         boolean corrected_by_human
         tsvector text_search
+        boolean low_confidence_text
     }
     corpus__regulatory_source {
         uuid id PK
@@ -196,6 +219,11 @@ erDiagram
         text base_url
         text permitted_use_statement
         text status
+        jsonb url_allow_list
+        text citation_requirement_text
+        uuid created_by FK
+        timestamp_with_time_zone created_at
+        uuid submitted_by FK
     }
     corpus__relationship {
         uuid id PK
@@ -208,6 +236,8 @@ erDiagram
         uuid proposed_by FK
         uuid confirmed_by FK
         timestamp_with_time_zone created_at
+        text legal_note
+        uuid legal_reviewer_id FK
     }
     corpus__taxonomy_label {
         uuid id PK
@@ -231,6 +261,8 @@ erDiagram
         boolean grounding_passed
         numeric confidence
         timestamp_with_time_zone created_at
+        uuid user_id FK
+        text presented_state
     }
     platform__app_user {
         uuid id PK
@@ -239,6 +271,7 @@ erDiagram
         text hashed_password
         text role
         timestamp_with_time_zone created_at
+        boolean is_active
     }
     platform__approval {
         uuid id PK
@@ -275,6 +308,18 @@ erDiagram
         uuid updated_by FK
         timestamp_with_time_zone updated_at
     }
+    platform__copilot_review {
+        uuid id PK
+        uuid interaction_id FK
+        text state
+        uuid requested_by FK
+        timestamp_with_time_zone requested_at
+        text request_note
+        uuid reviewer_id FK
+        text verdict
+        text corrected_text
+        timestamp_with_time_zone reviewed_at
+    }
     platform__outbox {
         uuid id PK
         text event_type
@@ -284,6 +329,7 @@ erDiagram
         timestamp_with_time_zone delivered_at
         integer attempts
     }
+    compliance__legal_position ||--o{ compliance__applicability_decision : "legal_position_id"
     compliance__organisation_profile ||--o{ compliance__applicability_decision : "profile_id"
     compliance__applicability_decision ||--o{ compliance__applicability_decision : "superseded_by"
     corpus__document_version ||--o{ compliance__applicability_decision : "target_version_id"
@@ -295,8 +341,11 @@ erDiagram
     compliance__assessment ||--o{ compliance__finding : "assessment_id"
     compliance__control ||--o{ compliance__finding : "control_id"
     compliance__obligation ||--o{ compliance__finding : "obligation_id"
+    compliance__legal_position ||--o{ compliance__legal_position_citation : "legal_position_id"
+    corpus__provision_version ||--o{ compliance__legal_position_citation : "provision_version_id"
     platform__ai_call_log ||--o{ compliance__obligation : "ai_call_id"
     compliance__applicability_decision ||--o{ compliance__obligation : "applicability_decision_id"
+    compliance__legal_position ||--o{ compliance__obligation : "legal_position_id"
     corpus__provision_version ||--o{ compliance__obligation : "primary_citation_id"
     compliance__control ||--o{ compliance__obligation_control_map : "control_id"
     compliance__obligation ||--o{ compliance__obligation_control_map : "obligation_id"
@@ -304,6 +353,7 @@ erDiagram
     compliance__obligation ||--o{ compliance__risk : "obligation_id"
     corpus__provision_version ||--o{ corpus__change : "base_pv_id"
     corpus__change_set ||--o{ corpus__change : "change_set_id"
+    compliance__legal_position ||--o{ corpus__change : "legal_position_id"
     corpus__provision_version ||--o{ corpus__change : "new_pv_id"
     corpus__provision ||--o{ corpus__change : "provision_id"
     corpus__document_version ||--o{ corpus__change_set : "base_version_id"
@@ -317,6 +367,7 @@ erDiagram
     corpus__document ||--o{ corpus__relationship : "source_document_id"
     corpus__document ||--o{ corpus__relationship : "target_document_id"
     corpus__document ||--o{ corpus__taxonomy_label : "document_id"
+    platform__ai_call_log ||--o{ platform__copilot_review : "interaction_id"
 ```
 
 Catatan: kolom aktor (`*_by`, `owner_id`, `maker_id`, …) semuanya FK ke `platform.app_user` dan tidak digambar agar diagram terbaca. Hanya 12 kolom pertama tiap tabel yang ditampilkan; daftar lengkap ada di [data_dictionary.md](data_dictionary.md).

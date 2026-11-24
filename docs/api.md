@@ -53,10 +53,13 @@ _Dibangkitkan otomatis (`python -m app.api_docs`) dari kode. Spesifikasi lengkap
 | POST | `/api/v1/compliance/controls/{control_id}/assessments` | Assess |
 | POST | `/api/v1/compliance/controls/{control_id}/evidence` | Upload Evidence |
 | POST | `/api/v1/compliance/controls/{control_id}/owner` | Set Control Owner |
+| GET | `/api/v1/compliance/legal-queue` | Antrian Peninjau Hukum: semua eskalasi yang menunggu posisi hukum, dikumpulkan di satu tempat |
 | GET | `/api/v1/compliance/obligations` | List Obligations |
 | POST | `/api/v1/compliance/obligations/extract` | Extract |
 | POST | `/api/v1/compliance/obligations/{ob_id}/controls/{control_id}` | Map Control |
 | POST | `/api/v1/compliance/obligations/{ob_id}/decision` | Decide |
+| POST | `/api/v1/compliance/obligations/{ob_id}/escalate` | W8 (FRD Eksibit 33; TRD AOM.ESCALATED_TO_LEGAL): IN_VALIDATION → PENDING_LEGAL oleh Pejabat Kepatuhan, pertanyaan wajib. |
+| POST | `/api/v1/compliance/obligations/{ob_id}/legal-answer` | W8 (FRD Eksibit 33; TRD AOM.LEGAL_POSITION_RECORDED): PENDING_LEGAL → IN_VALIDATION oleh Peninjau Hukum. |
 | POST | `/api/v1/compliance/obligations/{ob_id}/reopen` | W8: REVIEW_REQUIRED → IN_VALIDATION. Opsional: arahkan sitasi ke ketentuan yang sama pada versi terbit terbaru. |
 | POST | `/api/v1/compliance/obligations/{ob_id}/validate` | Validate |
 | POST | `/api/v1/compliance/profiles` | Create Profile |
@@ -67,21 +70,35 @@ _Dibangkitkan otomatis (`python -m app.api_docs`) dari kode. Spesifikasi lengkap
 
 | Metode | Path | Keterangan |
 |---|---|---|
+| GET | `/api/v1/copilot/interactions` | FR-COP-004: log interaksi (pertanyaan, pasal yang diambil, model, templat). review=pending → antrean tinjauan. |
+| POST | `/api/v1/copilot/interactions/{iid}/request-review` | Request Review |
 | POST | `/api/v1/copilot/query` | Query |
+| POST | `/api/v1/copilot/reviews/{rid}/verdict` | Verdict |
 
 ## corpus
 
 | Metode | Path | Keterangan |
 |---|---|---|
 | POST | `/api/v1/citations/resolve` | KONTRAK ANTAR-MODUL (dibekukan Minggu 4). |
+| GET | `/api/v1/corpus/catalog` | Catalog Search |
 | POST | `/api/v1/corpus/changes` | Compute |
 | GET | `/api/v1/corpus/documents` | List Documents |
 | POST | `/api/v1/corpus/documents` | Create Document |
+| DELETE | `/api/v1/corpus/documents/{doc_id}` | Dokumen hanya dapat dihapus bila belum pernah terbit (semua versinya draf) dan tidak dirujuk relasi. |
+| GET | `/api/v1/corpus/documents/{doc_id}` | Get Document |
+| PATCH | `/api/v1/corpus/documents/{doc_id}` | Perbaiki judul/jenis/penerbit kapan saja; nomor regulasi hanya selama belum pernah terbit |
+| GET | `/api/v1/corpus/documents/{doc_id}/as-of` | Document As Of |
 | POST | `/api/v1/corpus/documents/{doc_id}/versions` | Upload Version |
+| GET | `/api/v1/corpus/facets` | Catalog Facets |
 | PATCH | `/api/v1/corpus/provision-versions/{pv_id}` | Correct Provision |
+| POST | `/api/v1/corpus/provision-versions/{pv_id}/confirm-text` | FR-RKM-004: analis menyatakan teks hasil OCR sudah sesuai PDF aslinya (tanpa mengubah teks). |
 | GET | `/api/v1/corpus/search` | Search |
+| DELETE | `/api/v1/corpus/versions/{version_id}` | Hanya versi DRAF yang dapat dihapus. Versi terbit imutabel (trigger DB) → gunakan 'tarik versi'. |
+| PATCH | `/api/v1/corpus/versions/{version_id}` | Perbaiki tanggal berlaku versi yang MASIH DRAF. Versi terbit imutabel: tarik lalu unggah ulang. |
+| GET | `/api/v1/corpus/versions/{version_id}/file` | Berkas asli (PDF/TXT) sebuah versi, untuk dibandingkan dengan teks pasal (mis. memeriksa hasil OCR). |
 | GET | `/api/v1/corpus/versions/{version_id}/provisions` | List Provisions |
 | POST | `/api/v1/corpus/versions/{version_id}/publish` | Publish |
+| POST | `/api/v1/corpus/versions/{version_id}/withdraw` | Versi terbit ditarik (WITHDRAWN), bukan dihapus: tidak lagi dipakai pencarian/copilot/ekstraksi, |
 
 ## corpus-review
 
@@ -100,7 +117,29 @@ _Dibangkitkan otomatis (`python -m app.api_docs`) dari kode. Spesifikasi lengkap
 | POST | `/api/v1/corpus/labels/{lid}/remove` | Remove Label |
 | GET | `/api/v1/corpus/relationships` | List Relationships |
 | POST | `/api/v1/corpus/relationships` | Propose Relationship |
-| POST | `/api/v1/corpus/relationships/{rid}/confirm` | Confirm Relationship |
+| DELETE | `/api/v1/corpus/relationships/{rid}` | Relasi regulasi: D = Analis. Hanya usulan (PROPOSED); relasi CONFIRMED sudah mengubah status dokumen → tidak boleh hilang. |
+| PATCH | `/api/v1/corpus/relationships/{rid}` | Relasi regulasi: hanya Analis yang menyunting, selama masih diajukan atau sedang direvisi. |
+| POST | `/api/v1/corpus/relationships/{rid}/confirm` | Konfirmasi relasi mengubah status dokumen (mis. REVOKED) → persetujuan Manajer Kepatuhan (baris |
+| POST | `/api/v1/corpus/relationships/{rid}/legal-note` | Peninjau Hukum memberi catatan hukum tanpa mengubah relasi; Manajer tetap boleh memutuskan. |
+| POST | `/api/v1/corpus/relationships/{rid}/reject` | Manajer menolak usulan relasi (alasan wajib); status dokumen tidak berubah. Pengusul tidak boleh memutuskan. |
+| POST | `/api/v1/corpus/relationships/{rid}/request-revision` | Peninjau Hukum minta revisi (catatan wajib): PROPOSED → REVISION_REQUESTED. Manajer menunggu revisi Analis. |
+| POST | `/api/v1/corpus/relationships/{rid}/resubmit` | Analis merevisi lalu mengajukan ulang: REVISION_REQUESTED → PROPOSED (kembali menunggu Manajer). |
+
+## corpus-sources
+
+| Metode | Path | Keterangan |
+|---|---|---|
+| GET | `/api/v1/corpus/sources` | List Sources |
+| POST | `/api/v1/corpus/sources` | Create Source |
+| POST | `/api/v1/corpus/sources/{sid}/decision` | Decide Source |
+| POST | `/api/v1/corpus/sources/{sid}/status` | Tangguhkan / aktifkan kembali / pensiunkan. RETIRED memerlukan hak D (hapus lunak) pada registri. |
+| POST | `/api/v1/corpus/sources/{sid}/submit` | Ajukan ulang sumber yang dikembalikan (setelah diperbaiki). |
+
+## executive
+
+| Metode | Path | Keterangan |
+|---|---|---|
+| GET | `/api/v1/compliance/executive/posture` | Posture |
 
 ## findings
 
@@ -129,10 +168,21 @@ _Dibangkitkan otomatis (`python -m app.api_docs`) dari kode. Spesifikasi lengkap
 |---|---|---|
 | GET | `/health` | Health |
 
+## owner
+
+| Metode | Path | Keterangan |
+|---|---|---|
+| POST | `/api/v1/compliance/owner/findings/{fid}/plan` | Save Plan |
+| GET | `/api/v1/compliance/owner/workspace` | Workspace |
+
 ## platform
 
 | Metode | Path | Keterangan |
 |---|---|---|
+| GET | `/api/v1/admin/users` | Admin List Users |
+| POST | `/api/v1/admin/users` | Admin Create User |
+| DELETE | `/api/v1/admin/users/{uid}` | D (soft): menonaktifkan akun. Baris tetap ada agar audit_event/approval yang menunjuknya tetap sah. |
+| PATCH | `/api/v1/admin/users/{uid}` | Admin Update User |
 | GET | `/api/v1/audit` | Audit Log |
 | GET | `/api/v1/audit/export` | Audit Export |
 | POST | `/api/v1/auth/login` | Pembatasan laju: percobaan gagal per (akun, IP) per 60 detik (auth.max_failed_logins_per_minute). |
@@ -140,7 +190,7 @@ _Dibangkitkan otomatis (`python -m app.api_docs`) dari kode. Spesifikasi lengkap
 | GET | `/api/v1/config` | List Config |
 | PUT | `/api/v1/config/{key}` | Update Config |
 | GET | `/api/v1/metrics` | Metrics |
-| GET | `/api/v1/users` | List Users |
+| GET | `/api/v1/users` | Direktori ringkas (id, username, peran) untuk pemilih pemilik/penanggung jawab di formulir. |
 
 ## reporting
 

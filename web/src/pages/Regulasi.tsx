@@ -320,10 +320,10 @@ const RELATION_TYPES: [string, string][] = [["AMENDS", "AMENDS (mengubah)"], ["R
 const published = (d?: Doc) => (d?.versions || []).filter(v => v.state === "PUBLISHED");
 
 // Halaman "Perubahan regulasi": bandingkan dua versi terbit (atas), nilai perubahan per pasal (kiri), relasi dokumen (kanan)
-export function Perubahan({ ctx }: { ctx: Ctx }) {
+export function Perubahan({ ctx, initial }: { ctx: Ctx; initial?: string }) {
   const [docs, reloadDocs] = useLoad<Doc[]>(() => api("/corpus/documents"), [], ctx.notify);
   const [sets, reloadSets] = useLoad<any[]>(() => api("/corpus/changesets"), [], ctx.notify);
-  const [sel, setSel] = useState<string | null>(null);
+  const [sel, setSel] = useState<string | null>(initial || null);  // initial: dibuka dari Antrian hukum
   const [pick, setPick] = useState({ doc: "", from: "", to: "" });
   const { run, busy } = useAction(ctx.notify, reloadSets);
   const reviewer = ctx.me.role === "REGULATORY_ANALYST"; // FRD: hanya Analis yang menjalankan deteksi/perbandingan
@@ -412,7 +412,7 @@ function ChangeItem({ c, ctx, onDone }: { c: any; ctx: Ctx; onDone: () => void }
     {c.diff_html && <div className="verbatim" dangerouslySetInnerHTML={{ __html: c.diff_html }} />}
     {c.review_state !== "REJECTED" && c.review_state !== "ESCALATED" && <div style={{ marginTop: 8 }}><Flow steps={REVIEW_STEPS} now={c.review_state} /></div>}
     {c.review_reason && <p className="small">Dinilai oleh {c.validated_by}: {c.semantic_type} — {c.review_reason}</p>}
-    {c.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {c.legal_question}{c.legal_answer && <><br />Posisi hukum: {c.legal_answer}</>}</p>}
+    {c.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {c.legal_question}{c.legal_answer && <><br />Posisi hukum{c.legal_position_version ? ` v${c.legal_position_version}` : ""}{c.legal_reviewer ? ` (${c.legal_reviewer})` : ""}: {c.legal_answer}</>}</p>}
     {c.return_reason && <p className="small" style={{ color: "var(--red)" }}>Dikembalikan Manajer: {c.return_reason}</p>}
     {c.review_state === "MATERIAL_CONFIRMED" && <div className="notice ok"><span>Dikonfirmasi {c.confirmed_by}. Ditandai untuk ditinjau: {c.impact?.obligations?.length || 0} kewajiban, {c.impact?.applicability_decisions?.length || 0} keputusan keberlakuan, {c.impact?.controls?.length || 0} kontrol.{c.impact?.note ? ` ${c.impact.note}` : ""}</span></div>}
 
@@ -451,7 +451,7 @@ const REL_STATE: Record<string, [string, string]> = {
   CONFIRMED: ["Disetujui", "green"], REJECTED: ["Ditolak", "red"],
 };
 
-function RelasiItem({ r, provs, ctx, onDone }: { r: any; provs: Prov[]; ctx: Ctx; onDone: () => void }) {
+export function RelasiItem({ r, provs, ctx, onDone }: { r: any; provs: Prov[]; ctx: Ctx; onDone: () => void }) {
   const { run, busy } = useAction(ctx.notify, onDone);
   const [text, setText] = useState("");                                         // catatan hukum / alasan tolak
   const [rev, setRev] = useState({ relation_type: r.relation_type, citing: r.citing_provision_version_id || "" });

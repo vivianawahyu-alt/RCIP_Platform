@@ -105,7 +105,7 @@ function DecisionCard({ d, ctx, onDone }: { d: any; ctx: Ctx; onDone: () => void
       <span>Disusun {d.maker} {fmtTime(d.created_at)}</span>{d.approver && <span>Disetujui {d.approver} {fmtTime(d.decided_at)}</span>}
       {d.suggested_value && d.suggested_value !== d.decision_value && <span className="badge amber">Berbeda dari saran aturan ({VL[d.suggested_value]})</span>}
       {d.review_owner && <span>Kajian: {d.review_owner}, target {fmtDate(d.review_target_date)}</span>}</div>
-    {d.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {d.legal_question}{d.legal_answer && <><br />Posisi hukum ({d.legal_reviewer}): {d.legal_answer}</>}</p>}
+    {d.legal_question && <p className="small" style={{ whiteSpace: "pre-line" }}>Pertanyaan hukum: {d.legal_question}{d.legal_answer && <><br />Posisi hukum{d.legal_position_version ? ` v${d.legal_position_version}` : ""} ({d.legal_reviewer}): {d.legal_answer}</>}</p>}
     {d.return_reason && d.state === "REJECTED_TO_MAKER" && <p className="small" style={{ color: "var(--red)" }}>Dikembalikan: {d.return_reason}</p>}
     {role === "COMPLIANCE_OFFICER" && ["IN_ASSESSMENT", "REJECTED_TO_MAKER"].includes(d.state) && <div className="row" style={{ marginTop: 8 }}>
       <button className="btn primary sm" disabled={busy} onClick={() => run(() => api(`/compliance/applicability/${d.id}/submit`, { method: "POST" }), "Diajukan ke Manajer Kepatuhan.")}>Ajukan persetujuan</button>
