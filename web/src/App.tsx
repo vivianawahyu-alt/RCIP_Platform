@@ -28,7 +28,8 @@ type Item = { route: string; label: string; desc: string; only?: Role[] };
 const MENU: { label: string; items: Item[] }[] = [
   { label: "Beranda", items: [{ route: "beranda", label: "Beranda", desc: "Postur kepatuhan", only: ["EXECUTIVE"] }] },
   { label: "Antrian hukum", items: [{ route: "antrian-hukum", label: "Antrian hukum", desc: "Eskalasi yang menunggu posisi hukum", only: ["LEGAL_REVIEWER"] }] },
-  { label: "Kontrol saya", items: [{ route: "kontrol-saya", label: "Kontrol saya", desc: "Bukti & temuan milik Anda", only: ["BUSINESS_CONTROL_OWNER"]},
+  { label: "Kontrol saya", items: [{ route: "kontrol-saya", label: "Kontrol saya", desc: "Bukti & temuan milik Anda", only: ["BUSINESS_CONTROL_OWNER"] }] },
+  { label: "Pusat Regulasi", items: [    
     { route: "regulasi", label: "Korpus & pasal", desc: "Dokumen, versi imutabel, dan teks pasal" },
     { route: "katalog", label: "Katalog peraturan", desc: "Telusuri seluruh peraturan" },
     { route: "sumber", label: "Sumber regulasi", desc: "Registri sumber & persetujuan penggunaan" },  // [A19]
