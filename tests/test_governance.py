@@ -87,6 +87,65 @@ def test_relationship_citation_version_not_published(client):
     assert response.status_code == 409
     assert response.json()["error_code"] == "VERSION_NOT_PUBLISHED"
 
+def test_relationship_citation_version_withdrawn(client):
+    a = login(client, "analyst")
+
+    # Buat dokumen dengan dua versi yang sudah dipublikasikan
+    d1, (v1, _) = _doc_with_two_versions(
+        client,
+        "Pasal 1\nBank wajib menjaga keamanan informasi.",
+        "Pasal 1\nBank wajib melakukan pengawasan."
+    )
+
+    # Buat dokumen sumber relationship
+    d2, _ = _doc_with_two_versions(
+        client,
+        "Pasal 1\nBank wajib melakukan pengawasan.",
+        "Pasal 1\nBank wajib melakukan pengawasan."
+    )
+
+    # Ambil provision version dari versi pertama
+    provisions = client.get(
+        f"{P}/corpus/versions/{v1}/provisions",
+        headers=a
+    )
+
+    assert provisions.status_code == 200
+    pv = provisions.json()["data"][0]["provision_version_id"]
+
+    # Tarik versi dokumen
+    withdraw = client.post(
+        f"{P}/corpus/versions/{v1}/withdraw",
+        headers=a,
+        json={"reason": "Pengujian validasi sitasi versi ditarik"}
+    )
+
+    assert withdraw.status_code == 200, withdraw.text
+    assert withdraw.json()["data"]["state"] == "WITHDRAWN"
+
+    # Pastikan provision tetap tersimpan setelah versi ditarik
+    provisions_after = client.get(
+        f"{P}/corpus/versions/{v1}/provisions",
+        headers=a
+    )
+
+    assert provisions_after.status_code == 200
+
+    # Coba gunakan sitasi dari versi yang sudah ditarik
+    response = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "AMENDS",
+            "citing_provision_version_id": pv
+        }
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error_code"] == "VERSION_WITHDRAWN"
+
 def test_materiality_confirmation_propagates_and_reopen(client):
     a, o, m, legal = login(client, "analyst"), login(client, "officer"), login(client, "manager"), login(client, "legal")
     doc, (v1, v2) = _doc_with_two_versions(client,
