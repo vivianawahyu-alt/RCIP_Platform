@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names
+from app.compliance.common import get_or_404, iso, now, require_text, sid, user_names, require_citations
 from app.compliance.legal_position import legal_position_view, record_legal_position
 from app.compliance.models import ApplicabilityDecision, Control, Obligation, ObligationControlMap
 from app.corpus.models import (Change, ChangeSet, Document, DocumentVersion, Provision, ProvisionVersion, Relationship,
@@ -271,8 +271,33 @@ def list_relationships(document_id: Optional[str] = None, db: Session = Depends(
                                  for r in db.scalars(stmt)])
 
 
+def _validate_relationship_citation(
+    db: Session,
+    citation_id: Optional[str],
+    required: bool = False
+):
+    if not citation_id:
+        if required:
+            require_citations(db, [])
+        return None
+
+    try:
+        citation_id = str(uuid.UUID(str(citation_id)))
+    except (ValueError, TypeError):
+        raise AppError(
+            422,
+            "CITATION_INVALID",
+            "ID sitasi harus berupa UUID yang valid"
+        )
+
+    require_citations(db, [citation_id])
+    return citation_id
+
 @router.post("/relationships", response_model=ResponseWrapper[dict])
 def propose_relationship(body: RelationshipIn, db: Session = Depends(get_db), user: AppUser = Depends(REL_CREATE)):
+    citation_id = _validate_relationship_citation(
+    db, body.citing_provision_version_id
+    )
     get_or_404(db, Document, body.source_document_id)
     get_or_404(db, Document, body.target_document_id)
     if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
@@ -280,7 +305,7 @@ def propose_relationship(body: RelationshipIn, db: Session = Depends(get_db), us
     if body.source_document_id == body.target_document_id:
         raise AppError(422, "SELF_RELATION", "Dokumen tidak dapat berelasi dengan dirinya sendiri")
     r = Relationship(source_document_id=body.source_document_id, target_document_id=body.target_document_id,
-                     relation_type=body.relation_type, citing_provision_version_id=body.citing_provision_version_id,
+                     relation_type=body.relation_type, citing_provision_version_id=citation_id,
                      note=body.note, proposed_by=user.id)
     db.add(r)
     db.flush()
@@ -304,14 +329,20 @@ def update_relationship(rid: str, body: RelationshipUpdateIn, db: Session = Depe
     """Relasi regulasi: hanya Analis yang menyunting, selama masih diajukan atau sedang direvisi."""
     r = get_or_404(db, Relationship, rid)
     if r.state not in REL_EDITABLE:
-        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya relasi yang diajukan/direvisi yang dapat disunting")       
+        raise AppError(409, "INVALID_STATE", f"Relasi berstatus {r.state}; hanya relasi yang diajukan/direvisi yang dapat disunting")
+    citation_id = _validate_relationship_citation(
+    db,
+    body.citing_provision_version_id
+    if body.citing_provision_version_id is not None
+    else str(r.citing_provision_version_id) if r.citing_provision_version_id else None
+    )
     before = {"relation_type": r.relation_type, "note": r.note, "citing": sid(r.citing_provision_version_id)}
     if body.relation_type is not None:
         if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
             raise AppError(422, "BAD_RELATION_TYPE", "relation_type tidak dikenal")
         r.relation_type = body.relation_type
     if body.citing_provision_version_id is not None:
-        r.citing_provision_version_id = body.citing_provision_version_id or None
+        r.citing_provision_version_id = citation_id
     if body.note is not None:
         r.note = body.note
     audit(db, user.id, "RELATIONSHIP_UPDATED", "relationship", r.id, before=before,
@@ -333,25 +364,60 @@ def delete_relationship(rid: str, db: Session = Depends(get_db), user: AppUser =
     return ResponseWrapper(data={"deleted_relationship_id": rid})
 
 
+
 @router.post("/relationships/{rid}/confirm", response_model=ResponseWrapper[dict])
-def confirm_relationship(rid: str, db: Session = Depends(get_db), user: AppUser = Depends(STATUS_APPROVE)):
-    """Konfirmasi relasi mengubah status dokumen (mis. REVOKED) → persetujuan Manajer Kepatuhan (baris
-    'Perubahan status dokumen': Analis C/R/U, Manajer R/A). Pengonfirmasi tidak boleh sama dengan pengusul."""
+def confirm_relationship(
+    rid: str,
+    db: Session = Depends(get_db),
+    user: AppUser = Depends(STATUS_APPROVE)
+):
+    """Konfirmasi relasi mengubah status dokumen."""
     r = _relationship(db, rid, {"PROPOSED"})
     enforce_maker_checker(user.id, r.proposed_by)
-    if not r.citing_provision_version_id:
-        raise AppError(422, "CITATION_REQUIRED", "Konfirmasi relasi wajib menyitasi ketentuan penetap (pasal penutup)")
-    r.state, r.confirmed_by = "CONFIRMED", user.id
+    _validate_relationship_citation(
+    db,
+    str(r.citing_provision_version_id) if r.citing_provision_version_id else None,
+    required=True
+    )
     target = db.get(Document, r.target_document_id)
-    new_status = {"REVOKES": "REVOKED", "PARTIALLY_REVOKES": "PARTIALLY_REVOKED", "AMENDS": "AMENDED"}.get(r.relation_type)
+    if target is None:
+        raise AppError(404, "DOCUMENT_NOT_FOUND", "Dokumen target tidak ditemukan")
+    new_status = {
+        "REVOKES": "REVOKED",
+        "PARTIALLY_REVOKES": "PARTIALLY_REVOKED",
+        "AMENDS": "AMENDED"
+    }.get(r.relation_type)
+
+    # T1: Cegah perubahan status dokumen yang sudah REVOKED
+    if target.status == "REVOKED" and new_status and new_status != "REVOKED":
+        raise AppError(
+            409,
+            "INVALID_STATUS_TRANSITION",
+            "Dokumen yang sudah REVOKED tidak dapat diubah statusnya melalui relasi baru."
+        )
+
+    # Konfirmasi relasi setelah seluruh validasi berhasil
+    r.state = "CONFIRMED"
+    r.confirmed_by = user.id
     if new_status:
         before = target.status
         target.status = new_status
-        audit(db, user.id, "DOCUMENT_STATUS_CHANGED", "document", target.id, before={"status": before},
-              after={"status": new_status, "relationship_id": str(r.id)})
+        audit(
+            db,
+            user.id,
+            "DOCUMENT_STATUS_CHANGED",
+            "document",
+            target.id,
+            before={"status": before},
+            after={
+                "status": new_status,
+                "relationship_id": str(r.id)
+            }
+        )
     audit(db, user.id, "RELATIONSHIP_CONFIRMED", "relationship", r.id)
     db.commit()
     return ResponseWrapper(data={"id": str(r.id), "state": r.state})
+
 
 
 def _relationship(db: Session, rid: str, allowed: set[str]) -> Relationship:
@@ -406,13 +472,19 @@ def resubmit_relationship(rid: str, body: RelationshipUpdateIn, db: Session = De
                           user: AppUser = Depends(REL_UPDATE)):
     """Analis merevisi lalu mengajukan ulang: REVISION_REQUESTED → PROPOSED (kembali menunggu Manajer)."""
     r = _relationship(db, rid, {"REVISION_REQUESTED"})
+    citation_id = _validate_relationship_citation(
+    db,
+    body.citing_provision_version_id
+    if body.citing_provision_version_id is not None
+    else str(r.citing_provision_version_id) if r.citing_provision_version_id else None
+    )
     before = {"state": r.state, "relation_type": r.relation_type, "citing": sid(r.citing_provision_version_id), "note": r.note}
     if body.relation_type is not None:
         if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
             raise AppError(422, "BAD_RELATION_TYPE", "relation_type tidak dikenal")
         r.relation_type = body.relation_type
-    if body.citing_provision_version_id:
-        r.citing_provision_version_id = body.citing_provision_version_id
+    if body.citing_provision_version_id is not None:
+        r.citing_provision_version_id = citation_id
     if body.note is not None:
         r.note = body.note
     r.state = "PROPOSED"

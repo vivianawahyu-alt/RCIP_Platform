@@ -19,6 +19,73 @@ def _doc_with_two_versions(client, v1, v2, title="Pelaporan Insiden Bank Umum"):
         vids.append(vid)
     return doc, vids
 
+def _doc_with_unpublished_version(client, body, title="Pelaporan Insiden Bank Umum"):
+    a = login(client, "analyst")
+    number = f"POJK GOV/{uuid.uuid4().hex[:6]}"
+
+    doc = client.post(
+        f"{P}/corpus/documents",
+        headers=a,
+        json={
+            "canonical_number": number,
+            "title_id": title
+        }
+    ).json()["data"]["id"]
+
+    unique = f"Dokumen uji {uuid.uuid4().hex}\n{body}"
+
+    response = client.post(
+        f"{P}/corpus/documents/{doc}/versions",
+        headers=a,
+        files={"file": ("t.txt", unique.encode())},
+        data={
+            "effective_date": str(date.today()),
+            "origin_url": ORIGIN
+        }
+    )
+
+    assert response.status_code == 200, response.text
+    version = response.json()["data"]
+
+    assert version["state"] == "SEGMENTED_DRAFT"
+
+    return doc, version["version_id"]
+
+def test_relationship_citation_version_not_published(client):
+    a = login(client, "analyst")
+
+    d1, version_id = _doc_with_unpublished_version(
+        client,
+        "Pasal 1\nBank wajib menjaga keamanan informasi."
+    )
+
+    d2, _ = _doc_with_two_versions(
+        client,
+        "Pasal 1\nBank wajib melakukan pengawasan.",
+        "Pasal 1\nBank wajib melakukan pengawasan."
+    )
+
+    provisions = client.get(
+        f"{P}/corpus/versions/{version_id}/provisions",
+        headers=a
+    )
+
+    assert provisions.status_code == 200
+    pv = provisions.json()["data"][0]["provision_version_id"]
+
+    response = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "AMENDS",
+            "citing_provision_version_id": pv
+        }
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error_code"] == "VERSION_NOT_PUBLISHED"
 
 def test_materiality_confirmation_propagates_and_reopen(client):
     a, o, m, legal = login(client, "analyst"), login(client, "officer"), login(client, "manager"), login(client, "legal")
@@ -141,6 +208,62 @@ def test_login_rate_limit_correlation_id_and_error_envelope(client):
     body = bad.json()
     assert bad.status_code == 422 and body["code"] == "VALIDATION_ERROR" and body["offending"]["field"] and body["correlation_id"]
 
+def test_relationship_invalid_citation_uuid(client):
+    a = login(client, "analyst")
+
+    d1, _ = _doc_with_two_versions(
+        client,
+        "Pasal 1\nBank wajib A.",
+        "Pasal 1\nBank wajib A."
+    )
+    d2, _ = _doc_with_two_versions(
+        client,
+        "Pasal 1\nBank wajib B.",
+        "Pasal 1\nBank wajib B."
+    )
+
+    response = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "AMENDS",
+            "citing_provision_version_id": "bukan-uuid"
+        }
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "CITATION_INVALID"
+
+def test_relationship_unresolved_citation(client):
+    a = login(client, "analyst")
+
+    d1, _ = _doc_with_two_versions(
+        client,
+        "Pasal 1\nBank wajib A.",
+        "Pasal 1\nBank wajib A."
+    )
+    d2, _ = _doc_with_two_versions(
+        client,
+        "Pasal 1\nBank wajib B.",
+        "Pasal 1\nBank wajib B."
+    )
+
+    response = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "AMENDS",
+            "citing_provision_version_id": str(uuid.uuid4())
+        }
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "CITATION_UNRESOLVED"
+
 
 def test_relationship_and_taxonomy(client):
     a, m = login(client, "analyst"), login(client, "manager")
@@ -243,6 +366,80 @@ def test_relationship_rejected_by_manager(client):
     assert client.post(f"{url}/confirm", headers=m).status_code == 409
     doc = next(d for d in client.get(f"{P}/corpus/documents", headers=a).json()["data"] if d["id"] == d1)
     assert doc["status"] != "REVOKED"
+
+
+def test_relationship_invalid_status_transition_from_revoked(client):
+    """T1: Dokumen REVOKED tidak boleh diubah menjadi status lain melalui relasi baru."""
+    a, m = login(client, "analyst"), login(client, "manager")
+
+    # Buat dokumen target dan dokumen sumber
+    d1, (v1, _) = _doc_with_two_versions(
+        client, "Pasal 1\nBank wajib A.", "Pasal 1\nBank wajib A."
+    )
+    d2, _ = _doc_with_two_versions(
+        client, "Pasal 1\nBank wajib B.", "Pasal 1\nBank wajib B."
+    )
+    pv = client.get(
+        f"{P}/corpus/versions/{v1}/provisions", headers=a
+    ).json()["data"][0]["provision_version_id"]
+
+    # Relasi REVOKES pertama: dokumen menjadi REVOKED
+    rel1 = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "REVOKES",
+            "citing_provision_version_id": pv
+        }
+    ).json()["data"]["id"]
+
+    confirmed = client.post(
+        f"{P}/corpus/relationships/{rel1}/confirm",
+        headers=m
+    )
+    assert confirmed.status_code == 200
+    doc = next(
+        d for d in client.get(
+            f"{P}/corpus/documents", headers=a
+        ).json()["data"] if d["id"] == d1
+    )
+    assert doc["status"] == "REVOKED"
+
+    # Relasi AMENDS baru terhadap dokumen yang sudah REVOKED
+    rel2 = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "AMENDS",
+            "citing_provision_version_id": pv
+        }
+    ).json()["data"]["id"]
+    rejected = client.post(
+        f"{P}/corpus/relationships/{rel2}/confirm",
+        headers=m
+    )
+    assert rejected.status_code == 409
+    assert rejected.json()["error_code"] == "INVALID_STATUS_TRANSITION"
+
+    # Pastikan status dokumen dan relasi tidak berubah
+    doc = next(
+        d for d in client.get(
+            f"{P}/corpus/documents", headers=a
+        ).json()["data"] if d["id"] == d1
+    )
+    assert doc["status"] == "REVOKED"
+    relationship = next(
+        r for r in client.get(
+            f"{P}/corpus/relationships?document_id={d1}",
+            headers=a
+        ).json()["data"] if r["id"] == rel2
+    )
+    assert relationship["state"] == "PROPOSED"
+
 
 def test_legal_cannot_validate_obligation(client):
     """TRD §7.6: IN_VALIDATION → PENDING_APPROVAL hanya diajukan Pejabat Kepatuhan; Peninjau Hukum hanya memberi posisi."""
