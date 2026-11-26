@@ -3,7 +3,7 @@ import { canDo } from "../permissions";
 import { ApiError, api, openFile } from "../api";
 import type { Doc, Source } from "../types";
 import type { Ctx } from "../ui";
-import  {INSTRUMENT_TYPES,Empty, Flow, PageHead, PasalText, Status, can, fmtDate, useAction, useLoad } from "../ui";
+import  {INSTRUMENT_TYPES,Empty, Flow, PageHead, PasalText, Status, can, fmtDate, isWebUrl, useAction, useLoad } from "../ui";
 import { CitationPicker } from "../CitationPicker";
 import type { Cite } from "../CitationPicker";
 
@@ -95,12 +95,14 @@ export function Regulasi({ ctx }: { ctx: Ctx }) {
           <header><div><h2>{selDoc?.canonical_number}</h2><p>{selDoc?.title_id} · versi {selVer.version_number}, berlaku {fmtDate(selVer.effective_date)}{selVer.extraction_method === "OCR" ? " · teks via OCR" : ""}</p>
             {/* [A14] provenans: sumber, URL asal, berkas asli → semua peran dapat membuka PDF aslinya untuk dibandingkan */}
             <div className="prov-meta">{selDoc?.source?.name && <>Sumber: {selDoc.source.name} · </>}
-              {selVer.origin_url ? <>URL asal: <a href={selVer.origin_url} target="_blank" rel="noreferrer">{selVer.origin_url}</a></> : "URL asal belum tercatat"}
+              {isWebUrl(selVer.origin_url) ? <>URL asal: <a href={selVer.origin_url!} target="_blank" rel="noreferrer">{selVer.origin_url}</a></> : "URL asal belum tercatat"}
               {selVer.file_name && <> · {selVer.file_name} ({fmtSize(selVer.size_bytes)})</>}</div></div>
             <span className="row">{selVer.has_file && <button className="btn sm" onClick={() => openFile(`/corpus/versions/${selVer.id}/file`).catch(e => ctx.notify("error", e.message))}>Lihat berkas asli</button>}
               <Status s={selVer.state} /></span></header>
                         {/* tanggal berlaku versi DRAF boleh diperbaiki; versi terbit imutabel (tarik lalu unggah ulang) */}
           {draft && analyst && <VersionDate key={selVer.id} v={selVer} busy={busy} run={run} />}
+          {/* versi lama (URL kosong / penanda seed): Analis dapat melengkapi URL asal; setelah terisi dikunci server */}
+          {analyst && !isWebUrl(selVer.origin_url) && <OriginUrlFill key={selVer.id} v={selVer} busy={busy} run={run} />}
           {/* [11d] kotak peringatan kuning: publikasi diblokir selama masih ada pasal OCR yang belum dikonfirmasi */}
           {draft && ocrPending > 0 && <div className="notice warn"><span>{ocrPending} pasal berasal dari OCR dan belum diperiksa. Bandingkan dengan PDF aslinya, lalu klik <b>Konfirmasi teks</b> atau <b>Koreksi teks</b> pada setiap pasal sebelum publikasi.</span></div>}
           {/* Pasal dikelompokkan per BAB; setiap BAB bisa dilipat/dibuka */}
@@ -237,6 +239,20 @@ function VersionDate({ v, busy, run }: { v: Doc["versions"][number]; busy: boole
     <input type="date" value={dt} onChange={e => setDt(e.target.value)} aria-label={`Tanggal berlaku versi ${v.version_number}`} />
     <button className="btn sm" disabled={busy || !dt || dt === v.effective_date}
       onClick={() => run(() => api(`/corpus/versions/${v.id}`, { method: "PATCH", body: { effective_date: dt } }), "Tanggal berlaku diperbarui.")}>Simpan tanggal</button>
+  </div>;
+}
+/** Lengkapi URL asal versi lama (kosong / penanda seed). Sekali tersimpan, URL dikunci oleh server. */
+function OriginUrlFill({ v, busy, run }: { v: Doc["versions"][number]; busy: boolean; run: Run }) {
+  const [url, setUrl] = useState("");
+  const valid = /^https?:\/\/\S+\.\S+/i.test(url.trim());
+  return <div className="row" style={{ margin: "6px 0 10px" }}>
+    <label className="small muted">URL asal versi {v.version_number}</label>
+    <input type="url" placeholder="https://..." value={url} style={{ minWidth: 280 }}
+      onChange={e => setUrl(e.target.value)} aria-label={`URL asal versi ${v.version_number}`} />
+    <button className="btn sm" disabled={busy || !valid}
+      onClick={() => run(() => api(`/corpus/versions/${v.id}/origin-url`, { method: "PATCH", body: { origin_url: url.trim() } }),
+        "URL asal disimpan dan dikunci.")}>Isi URL asal</button>
+    <span className="small muted">Setelah disimpan, URL tidak dapat diubah.</span>
   </div>;
 }
 /** [A15] KOMPONEN BARU. Ubah data dokumen. Nomor regulasi dikunci bila dokumen pernah terbit

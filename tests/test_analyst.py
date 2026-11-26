@@ -143,3 +143,21 @@ def test_copilot_low_confidence_review_by_analyst(client, db):
     with pytest.raises(DBAPIError):
         db.execute(text("UPDATE platform.ai_call_log SET prompt_rendered = 'x' WHERE id = :i"), {"i": iid})
     db.rollback()
+
+def test_fill_origin_url_for_legacy_version(client, db):
+    a, o = login(client, "analyst"), login(client, "officer")
+    doc = _doc(client, a).json()["data"]["id"]
+    content = f"Dokumen lama {uuid.uuid4().hex}\nPasal 1\nBank wajib menjaga data nasabah setiap saat.".encode()
+    vid = _upload(client, a, doc, content).json()["data"]["version_id"]
+    # meniru versi lama: URL asal berupa penanda seed
+    db.execute(text("UPDATE corpus.document_version SET origin_url='seed://synthetic' WHERE id=:i"), {"i": vid})
+    db.commit()
+    url = f"{P}/corpus/versions/{vid}/origin-url"
+    assert client.patch(url, headers=o, json={"origin_url": ORIGIN}).status_code == 403   # bukan Analis
+    bad = client.patch(url, headers=a, json={"origin_url": "ftp://x.go.id/a"})
+    assert bad.status_code == 422 and bad.json()["error_code"] == "INVALID_URL"
+    ok = client.patch(url, headers=a, json={"origin_url": ORIGIN})
+    assert ok.status_code == 200 and ok.json()["data"]["origin_url"] == ORIGIN
+    # sudah terisi → terkunci
+    again = client.patch(url, headers=a, json={"origin_url": "https://www.ojk.go.id/lain"})
+    assert again.status_code == 409 and again.json()["error_code"] == "ORIGIN_URL_LOCKED"
