@@ -467,7 +467,7 @@ def test_relationship_invalid_status_transition_from_revoked(client):
     assert doc["status"] == "REVOKED"
 
     # Relasi AMENDS baru terhadap dokumen yang sudah REVOKED
-    rel2 = client.post(
+    rejected = client.post(
         f"{P}/corpus/relationships",
         headers=a,
         json={
@@ -476,28 +476,95 @@ def test_relationship_invalid_status_transition_from_revoked(client):
             "relation_type": "AMENDS",
             "citing_provision_version_id": pv
         }
-    ).json()["data"]["id"]
-    rejected = client.post(
-        f"{P}/corpus/relationships/{rel2}/confirm",
-        headers=m
     )
+
     assert rejected.status_code == 409
     assert rejected.json()["error_code"] == "INVALID_STATUS_TRANSITION"
 
-    # Pastikan status dokumen dan relasi tidak berubah
+    # Pastikan status dokumen tetap REVOKED
     doc = next(
         d for d in client.get(
             f"{P}/corpus/documents", headers=a
         ).json()["data"] if d["id"] == d1
     )
     assert doc["status"] == "REVOKED"
-    relationship = next(
-        r for r in client.get(
-            f"{P}/corpus/relationships?document_id={d1}",
-            headers=a
-        ).json()["data"] if r["id"] == rel2
+
+
+
+def test_relationship_refers_to_revoked_target_with_warning(client):
+    """REFERS_TO tetap diperbolehkan untuk dokumen REVOKED dengan peringatan."""
+    a, m = login(client, "analyst"), login(client, "manager")
+
+    # Buat dokumen target dan dokumen sumber
+    d1, (v1, _) = _doc_with_two_versions(
+        client, "Pasal 1\nBank wajib A.", "Pasal 1\nBank wajib A."
     )
-    assert relationship["state"] == "PROPOSED"
+    d2, _ = _doc_with_two_versions(
+        client, "Pasal 1\nBank wajib B.", "Pasal 1\nBank wajib B."
+    )
+
+    pv = client.get(
+        f"{P}/corpus/versions/{v1}/provisions", headers=a
+    ).json()["data"][0]["provision_version_id"]
+
+    # Buat dokumen target menjadi REVOKED terlebih dahulu
+    rel1 = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "REVOKES",
+            "citing_provision_version_id": pv
+        }
+    ).json()["data"]["id"]
+
+    confirmed = client.post(
+        f"{P}/corpus/relationships/{rel1}/confirm",
+        headers=m
+    )
+    assert confirmed.status_code == 200
+
+    # Ajukan REFERS_TO terhadap dokumen yang sudah REVOKED
+    proposed = client.post(
+        f"{P}/corpus/relationships",
+        headers=a,
+        json={
+            "source_document_id": d2,
+            "target_document_id": d1,
+            "relation_type": "REFERS_TO",
+            "citing_provision_version_id": pv
+        }
+    )
+
+    assert proposed.status_code == 200
+    proposed_data = proposed.json()["data"]
+    assert proposed_data["warning"] is not None
+    assert "REVOKED" in proposed_data["warning"]
+
+    rel2 = proposed_data["id"]
+
+    # Konfirmasi REFERS_TO juga harus berhasil dengan peringatan
+    confirmed_refers_to = client.post(
+        f"{P}/corpus/relationships/{rel2}/confirm",
+        headers=m
+    )
+
+    assert confirmed_refers_to.status_code == 200
+    confirmed_data = confirmed_refers_to.json()["data"]
+    assert confirmed_data["state"] == "CONFIRMED"
+    assert confirmed_data["warning"] is not None
+    assert "REVOKED" in confirmed_data["warning"]
+
+    # Pastikan status dokumen target tetap REVOKED
+    doc = next(
+        d for d in client.get(
+            f"{P}/corpus/documents", headers=a
+        ).json()["data"] if d["id"] == d1
+    )
+    assert doc["status"] == "REVOKED"
+
+
 
 
 def test_legal_cannot_validate_obligation(client):

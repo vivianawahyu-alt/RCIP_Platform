@@ -293,29 +293,75 @@ def _validate_relationship_citation(
     require_citations(db, [citation_id])
     return citation_id
 
+def _validate_relationship_target_status(target, relation_type: str):
+    """Validasi relasi baru terhadap dokumen yang sudah REVOKED."""
+    if target.status == "REVOKED":
+        if relation_type == "REFERS_TO":
+            return (
+                "Peringatan: dokumen target sudah berstatus REVOKED "
+                "(sudah dicabut), tetapi relasi REFERS_TO tetap diperbolehkan."
+            )
+
+        raise AppError(
+            409,
+            "INVALID_STATUS_TRANSITION",
+            f"Relasi {relation_type} tidak diperbolehkan karena dokumen target sudah REVOKED."
+        )
+
+    return None
+
+
 @router.post("/relationships", response_model=ResponseWrapper[dict])
-def propose_relationship(body: RelationshipIn, db: Session = Depends(get_db), user: AppUser = Depends(REL_CREATE)):
+def propose_relationship(
+    body: RelationshipIn,
+    db: Session = Depends(get_db),
+    user: AppUser = Depends(REL_CREATE)
+):
     citation_id = _validate_relationship_citation(
-    db, body.citing_provision_version_id
+        db, body.citing_provision_version_id
     )
+
     get_or_404(db, Document, body.source_document_id)
-    get_or_404(db, Document, body.target_document_id)
-    if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
+    target = get_or_404(db, Document, body.target_document_id)
+
+    if body.relation_type not in {
+        "AMENDS", "REVOKES", "PARTIALLY_REVOKES",
+        "REFERS_TO", "IMPLEMENTS"
+    }:
         raise AppError(422, "BAD_RELATION_TYPE", "relation_type tidak dikenal")
+
     if body.source_document_id == body.target_document_id:
         raise AppError(422, "SELF_RELATION", "Dokumen tidak dapat berelasi dengan dirinya sendiri")
-    r = Relationship(source_document_id=body.source_document_id, target_document_id=body.target_document_id,
-                     relation_type=body.relation_type, citing_provision_version_id=citation_id,
-                     note=body.note, proposed_by=user.id)
+
+    warning = _validate_relationship_target_status(
+        target, body.relation_type
+    )
+
+    r = Relationship(
+        source_document_id=body.source_document_id,
+        target_document_id=body.target_document_id,
+        relation_type=body.relation_type,
+        citing_provision_version_id=citation_id,
+        note=body.note,
+        proposed_by=user.id
+    )
+
     db.add(r)
     db.flush()
-    audit(db, user.id, "RELATIONSHIP_PROPOSED", "relationship", r.id, after={"type": r.relation_type})
+
+    audit(
+        db, user.id, "RELATIONSHIP_PROPOSED",
+        "relationship", r.id,
+        after={"type": r.relation_type}
+    )
+
     db.commit()
-    return ResponseWrapper(data={"id": str(r.id), "state": r.state})
 
-
-REL_EDITABLE = {"PROPOSED", "REVISION_REQUESTED"}
-
+    return ResponseWrapper(data={
+        "id": str(r.id),
+        "state": r.state,
+        "warning": warning
+    })
 
 class RelationshipUpdateIn(BaseModel):
     relation_type: Optional[str] = None
@@ -374,31 +420,31 @@ def confirm_relationship(
     """Konfirmasi relasi mengubah status dokumen."""
     r = _relationship(db, rid, {"PROPOSED"})
     enforce_maker_checker(user.id, r.proposed_by)
+
     _validate_relationship_citation(
-    db,
-    str(r.citing_provision_version_id) if r.citing_provision_version_id else None,
-    required=True
+        db,
+        str(r.citing_provision_version_id) if r.citing_provision_version_id else None,
+        required=True
     )
+
     target = db.get(Document, r.target_document_id)
     if target is None:
         raise AppError(404, "DOCUMENT_NOT_FOUND", "Dokumen target tidak ditemukan")
+
+    warning = _validate_relationship_target_status(
+        target, r.relation_type
+    )
+
     new_status = {
         "REVOKES": "REVOKED",
         "PARTIALLY_REVOKES": "PARTIALLY_REVOKED",
         "AMENDS": "AMENDED"
     }.get(r.relation_type)
 
-    # T1: Cegah perubahan status dokumen yang sudah REVOKED
-    if target.status == "REVOKED" and new_status and new_status != "REVOKED":
-        raise AppError(
-            409,
-            "INVALID_STATUS_TRANSITION",
-            "Dokumen yang sudah REVOKED tidak dapat diubah statusnya melalui relasi baru."
-        )
-
     # Konfirmasi relasi setelah seluruh validasi berhasil
     r.state = "CONFIRMED"
     r.confirmed_by = user.id
+
     if new_status:
         before = target.status
         target.status = new_status
@@ -414,10 +460,15 @@ def confirm_relationship(
                 "relationship_id": str(r.id)
             }
         )
+
     audit(db, user.id, "RELATIONSHIP_CONFIRMED", "relationship", r.id)
     db.commit()
-    return ResponseWrapper(data={"id": str(r.id), "state": r.state})
 
+    return ResponseWrapper(data={
+        "id": str(r.id),
+        "state": r.state,
+        "warning": warning
+    })
 
 
 def _relationship(db: Session, rid: str, allowed: set[str]) -> Relationship:
