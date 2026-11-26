@@ -39,7 +39,8 @@ cd web && npm install && npm run dev      # http://localhost:5173  (API: http://
 ## 3. Memperbarui instalasi yang sudah berjalan (data dipertahankan)
 
 ```bash
-make backup   # atau: docker exec rcip_postgres pg_dump -U rcip -d rcip_db > rcip_backup.sql
+make backup   # atau: docker exec rcip_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > 
+rcip_backup.sql
 # ganti kode dengan versi baru, pertahankan .env Anda
 docker compose up -d --build              # --build karena requirements/Dockerfile dapat berubah
 docker compose exec api alembic upgrade head
@@ -75,7 +76,7 @@ Parameter runtime (jendela remediasi, ambang keyakinan AI, SLA reviu, ukuran buk
 | Kesehatan | `curl http://localhost:8000/health` |
 | Metrik | `GET /api/v1/metrics` (login admin/auditor) atau halaman Administrasi |
 | Backup | `make backup` → berkas `.sql`; juga salin folder `storage/` (berkas bukti) |
-| Restore | DB kosong → `docker exec -i rcip_postgres psql -U rcip -d rcip_db < backup.sql` |
+| Restore | DB kosong → `docker exec -i rcip_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backup.sql` |
 | Test | `docker compose exec api pytest -q` (35+ test, termasuk generator & evaluasi AI) |
 | Evaluasi AI | `docker compose exec api python -m app.ai.evaluate` (perlu korpus sintetis) |
 | Regenerasi dokumentasi | `python -m app.api_docs` · `python -m seed.data_dictionary` |

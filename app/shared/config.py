@@ -5,15 +5,17 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "RCIP Platform"
     ENVIRONMENT: str = "development"
 
-    DATABASE_URL: str = "postgresql+psycopg://rcip:rcip_dev_password@localhost:5432/rcip_db"
+    # Kredensial WAJIB dari environment variable / file .env — tidak ada nilai cadangan di kode.
+    DATABASE_URL: str = ""
     REDIS_URL: str = "redis://localhost:6379/0"
 
     MINIO_ENDPOINT: str = "minio:9000"
-    MINIO_ACCESS_KEY: str = "rcip_minio"
-    MINIO_SECRET_KEY: str = "rcip_minio_secret"
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""  
     MINIO_BUCKET_NAME: str = "rcip-corpus"
+ 
 
-    JWT_SECRET_KEY: str = "dev_only_secret_change_in_prod_32chars_min"
+    JWT_SECRET_KEY: str = ""    
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
@@ -26,10 +28,18 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    def check_required(self) -> None:
+        """Hentikan aplikasi dengan pesan jelas bila kredensial wajib belum diisi di .env."""
+        missing = [k for k in ("DATABASE_URL", "JWT_SECRET_KEY") if not getattr(self, k).strip()]
+        if missing:
+            raise RuntimeError(
+                f"Environment variable wajib belum diisi: {', '.join(missing)}. "
+                "Salin .env.example menjadi .env lalu lengkapi nilainya (lihat README bagian Keamanan).")
+
     def assert_safe_for_environment(self) -> None:
         """Tolak start di produksi dengan secret bawaan; peringatan di pengembangan."""
         import logging
-        weak = len(self.JWT_SECRET_KEY) < 32 or self.JWT_SECRET_KEY.startswith(("change_this", "dev_only"))
+        weak = len(self.JWT_SECRET_KEY) < 32 or self.JWT_SECRET_KEY.startswith(("change_this", "dev_only", "ganti"))
         if weak and self.ENVIRONMENT.lower() == "production":
             raise RuntimeError("JWT_SECRET_KEY bawaan/lemah tidak boleh dipakai di production")
         if weak:
@@ -37,3 +47,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+settings.check_required()

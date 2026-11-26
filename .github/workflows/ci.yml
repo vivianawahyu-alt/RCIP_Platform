@@ -8,20 +8,22 @@ jobs:
     services:
       postgres:
         image: postgres:16-alpine
-        env: {POSTGRES_USER: rcip, POSTGRES_PASSWORD: rcip_dev_password, POSTGRES_DB: rcip_db}
+        # password database CI dibuat per-run (tidak ada kredensial tetap yang tersimpan di repo)
+        env: {POSTGRES_USER: rcip, POSTGRES_PASSWORD: "ci-${{ github.run_id }}-${{ github.run_attempt }}", POSTGRES_DB: rcip_db}
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U rcip -d rcip_db" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://rcip:rcip_dev_password@localhost:5432/rcip_db
-      JWT_SECRET_KEY: ci_only_secret_key_value_with_32_chars_min
+      DATABASE_URL: "postgresql+psycopg://rcip:ci-${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/rcip_db"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-            # pasang Tesseract di server CI; tanpa ini tes OCR otomatis di-skip (FR-RKM-004)
+      # pasang Tesseract di server CI; tanpa ini tes OCR otomatis di-skip (FR-RKM-004)
       - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-ind
       - run: pip install -r requirements.txt
+      # rahasia JWT dibuat acak setiap run CI
+      - run: python scripts/gen_secret_key.py | grep -E '^JWT_SECRET_KEY=' >> "$GITHUB_ENV"
       - run: alembic upgrade head
       - run: python -m seed.run
       - run: python -m seed.validate

@@ -29,6 +29,15 @@ cd web && npm install && npm run dev
 Jangan jalankan `docker compose down -v` (menghapus database). Bila `npm run dev` gagal karena izin/esbuild, hapus `web/node_modules` lalu `npm install`.
 Dataset demo lengkap sebaiknya dibuat di database terpisah — lihat [docs/synthetic_data.md](docs/synthetic_data.md).
 
+## Keamanan database
+- **Kredensial hanya di `.env`** (tidak ikut Git). Tidak ada password/secret cadangan di kode, `docker-compose.yml`, atau CI;
+  aplikasi & compose berhenti dengan pesan jelas bila `DATABASE_URL`, `JWT_SECRET_KEY`, atau `POSTGRES_*` belum diisi.
+- **Database wajib password** untuk semua koneksi, termasuk dari dalam container (`docker/postgres/pg_hba.conf`, SCRAM-SHA-256).
+  Port 5432 & 6379 hanya terbuka untuk localhost.
+- Aplikasi menyambung otomatis lewat `DATABASE_URL`; password hanya diminta saat membuka database manual:
+  `docker exec -it rcip_postgres psql -U rcip -d rcip_db` → isi nilai `POSTGRES_PASSWORD` dari `.env`.
+- Setelah `git pull` versi ini cukup jalankan `docker compose up -d` (password lama di `.env` tetap dipakai).
+
 ## Dokumentasi (deliverable proposal hal. 22)
 | Dokumen | Isi |
 |---|---|
