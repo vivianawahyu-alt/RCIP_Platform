@@ -386,6 +386,22 @@ def test_relationship_confirmed_by_manager_not_legal(client):
     rel = client.post(f"{P}/corpus/relationships", headers=a, json={"source_document_id": d2, "target_document_id": d1,
                       "relation_type": "REVOKES", "citing_provision_version_id": pv}).json()["data"]["id"]
     url = f"{P}/corpus/relationships/{rel}"
+
+    # Legal Reviewer hanya memiliki akses baca untuk data relasi
+    read_response = client.get(
+        f"{P}/corpus/relationships?document_id={d1}",
+        headers=legal
+    )
+    assert read_response.status_code == 200
+
+    # Legal Reviewer tidak dapat menghapus atau menolak relasi
+    assert client.delete(url, headers=legal).status_code == 403
+    assert client.post(
+        f"{url}/reject",
+        headers=legal,
+        json={"reason": "Tidak disetujui"}
+    ).status_code == 403
+
     row = lambda: next(x for x in client.get(f"{P}/corpus/relationships?document_id={d1}", headers=a).json()["data"] if x["id"] == rel)
     # Peninjau Hukum tidak dapat mengubah relasi, tetapi dapat memberi catatan hukum
     assert client.patch(url, headers=legal, json={"note": "ubah"}).status_code == 403
