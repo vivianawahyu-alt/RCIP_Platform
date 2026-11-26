@@ -1,3 +1,6 @@
 # Berkas korpus tim disimpan apa adanya (tanpa konversi akhir baris CRLF/LF oleh Git di Windows),
 # agar berkas .txt asli tetap identik byte-per-byte dengan sidik jari sha256-nya.
 data/korpus/** -text
+
+# Konfigurasi PostgreSQL dibaca di Linux (container): paksa akhir baris LF meski di-checkout di Windows
+docker/postgres/pg_hba.conf text eol=lf

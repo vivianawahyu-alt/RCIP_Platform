@@ -24,4 +24,5 @@ evaluate:
 docs-gen:
 	docker compose exec api python -m seed.data_dictionary
 backup:
-	docker exec rcip_postgres pg_dump -U rcip -d rcip_db > rcip_backup_$$(date +%Y%m%d_%H%M).sql
+# database wajib password: kredensial diambil dari environment container (berasal dari .env), tidak ditulis di sini
+	docker exec rcip_postgres sh -c 'PGPASSWORD="$$POSTGRES_PASSWORD" pg_dump -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' > rcip_backup_$$(date +%Y%m%d_%H%M).sql

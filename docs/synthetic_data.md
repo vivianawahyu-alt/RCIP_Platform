@@ -8,10 +8,12 @@ Generator membutuhkan database **kosong** (sudah dimigrasi, belum di-seed) agar 
 
 ```bash
 # opsi A — database demo terpisah (data kerja di rcip_db tidak tersentuh)
-docker exec rcip_postgres createdb -U rcip rcip_demo
-docker compose exec -e DATABASE_URL=postgresql+psycopg://rcip:rcip_dev_password@postgres:5432/rcip_demo api alembic upgrade head
-docker compose exec -e DATABASE_URL=postgresql+psycopg://rcip:rcip_dev_password@postgres:5432/rcip_demo api python -m seed.generate --seed 42
-docker compose exec -e DATABASE_URL=postgresql+psycopg://rcip:rcip_dev_password@postgres:5432/rcip_demo api python -m seed.validate
+# createdb meminta password database (nilai POSTGRES_PASSWORD di .env)
+docker exec -it rcip_postgres createdb -U rcip rcip_demo
+# ${DATABASE_URL%/*} = DATABASE_URL dari .env tanpa nama database; kredensial tidak perlu diketik ulang
+docker compose exec api sh -c 'DATABASE_URL="${DATABASE_URL%/*}/rcip_demo" alembic upgrade head'
+docker compose exec api sh -c 'DATABASE_URL="${DATABASE_URL%/*}/rcip_demo" python -m seed.generate --seed 42'
+docker compose exec api sh -c 'DATABASE_URL="${DATABASE_URL%/*}/rcip_demo" python -m seed.validate'
 # lalu ubah DATABASE_URL di .env ke .../rcip_demo dan `docker compose restart api worker`
 
 # opsi B — tanpa Docker

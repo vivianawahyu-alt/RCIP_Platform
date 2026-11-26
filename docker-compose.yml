@@ -2,21 +2,28 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: rcip_postgres
+    # Kredensial HANYA dari file .env (tanpa nilai cadangan di sini); compose berhenti dengan pesan bila belum diisi.
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-rcip}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcip_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-rcip_db}
-    ports: ["5432:5432"]
-    volumes: [postgres_data:/var/lib/postgresql/data]
+      POSTGRES_USER: ${POSTGRES_USER:?isi POSTGRES_USER di file .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di file .env}
+      POSTGRES_DB: ${POSTGRES_DB:?isi POSTGRES_DB di file .env}
+      POSTGRES_INITDB_ARGS: "--auth-local=scram-sha-256 --auth-host=scram-sha-256"
+    # pg_hba.conf sendiri: setiap koneksi (termasuk docker exec psql) wajib password — berlaku juga untuk volume lama
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+    # hanya bisa diakses dari laptop ini (localhost), tidak dari jaringan lain
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rcip -d rcip_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["127.0.0.1:6379:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -27,8 +34,8 @@ services:
   #   image: minio/minio:latest
     # command: server /data --console-address ":9001"
     # environment:
-    #   MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-rcip_minio}
-    #   MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-rcip_minio_secret}
+    #   MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?isi MINIO_ACCESS_KEY di file .env}
+    #   MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?isi MINIO_SECRET_KEY di file .env}
     # ports: ["9000:9000", "9001:9001"]
     # volumes: [minio_data:/data]
 
