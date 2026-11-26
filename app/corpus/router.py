@@ -496,6 +496,28 @@ def update_version(version_id: str, body: VersionUpdate, db: Session = Depends(g
         _share(db, dv.document_id)
     return ResponseWrapper(data={"version_id": str(dv.id), "effective_date": str(dv.effective_date)})
 
+class OriginUrlIn(BaseModel):
+    origin_url: str
+
+
+@router.patch("/api/v1/corpus/versions/{version_id}/origin-url", response_model=ResponseWrapper[dict])
+def fill_origin_url(version_id: str, body: OriginUrlIn, db: Session = Depends(get_db),
+                    user: AppUser = Depends(require("ingestion", "C"))):  # sama dengan hak unggah versi: Analis
+    """Lengkapi URL asal versi lama yang belum tercatat. Sekali terisi URL http(s), URL dikunci."""
+    dv = _get(db, DocumentVersion, version_id)
+    current = (dv.origin_url or "").strip()
+    if current.lower().startswith(("http://", "https://")):
+        raise AppError(409, "ORIGIN_URL_LOCKED", "URL asal sudah tercatat dan tidak dapat diubah")
+    url = normalise_url(body.origin_url)  # 422 INVALID_URL bila bukan http(s)
+    doc = _get(db, Document, str(dv.document_id))
+    source = get_source(db, str(doc.source_id))
+    dv.origin_url = url
+    audit(db, user.id, "VERSION_ORIGIN_URL_FILLED", "document_version", dv.id,
+          before={"origin_url": current or None}, after={"origin_url": url})
+    db.commit()
+    _share(db, dv.document_id)
+    return ResponseWrapper(data={"version_id": str(dv.id), "origin_url": url,
+                                 "origin_outside_source": not url_allowed(source, url)})
 
 @router.post("/api/v1/corpus/changes", response_model=ResponseWrapper[dict])
 def compute(body: ChangeRequest, db: Session = Depends(get_db),

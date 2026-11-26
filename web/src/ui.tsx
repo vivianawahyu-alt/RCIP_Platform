@@ -74,6 +74,9 @@ export function Flow({ steps, now }: { steps: [string, string][]; now: string })
 export const fmtDate = (s?: string | null) => s ? new Date(s.length === 10 ? s + "T00:00:00" : s).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "—";
 export const fmtTime = (s?: string | null) => s ? new Date(s).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 export const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+/** URL asal yang bisa dibuka di browser (bukan penanda seed:// atau synthetic://). */
+export const isWebUrl = (u?: string | null) => !!u && /^https?:\/\//i.test(u.trim());
+
 
 /** Izin UI = salinan matriks RBAC server (web/src/permissions.ts, dibangkitkan otomatis). Server tetap sumber kebenaran. */
 const ACTION: Record<string, [string, string]> = {

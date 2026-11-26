@@ -3,7 +3,7 @@ import { api, openFile } from "../api";
 import { canDo } from "../permissions";
 import type { AsOf, DocDetail } from "../types";
 import type { Ctx } from "../ui";
-import { Empty, PageHead, Status, fmtDate, useLoad } from "../ui";
+import { Empty, PageHead, Status, fmtDate, isWebUrl, useLoad } from "../ui";
 
 type Prov = { provision_version_id: string; number_label: string; path: string; text: string };
 type View = { title: string; note?: string; provs: Prov[] };
@@ -80,7 +80,7 @@ export function Peraturan({ ctx, id }: { ctx: Ctx; id?: string }) {
           {d.versions.length ? <ul className="list">{d.versions.map(v => <li key={v.id}>
             <div className="between"><div className="title">Versi {v.version_number}</div><Status s={v.state} /></div>
             <div className="sub">Berlaku {fmtDate(v.effective_date)} · {v.provision_count} pasal{v.extraction_method === "OCR" ? " · teks via OCR" : ""}</div>
-            {v.origin_url && <div className="small muted">URL asal: <a href={v.origin_url} target="_blank" rel="noreferrer">{v.origin_url}</a></div>}
+            <div className="small muted">{isWebUrl(v.origin_url) ? <>URL asal: <a href={v.origin_url!} target="_blank" rel="noreferrer">{v.origin_url}</a></> : "URL asal belum tercatat"}</div>
             <div className="row" style={{ marginTop: 6 }}>
               <button className="btn sm" onClick={() => openVersion(v.id, `Versi ${v.version_number} · berlaku ${fmtDate(v.effective_date)}`)}>Lihat pasal</button>
               {v.has_file && <button className="btn sm" onClick={() => openFile(`/corpus/versions/${v.id}/file`).catch(e => ctx.notify("error", e.message))}>Lihat berkas asli</button>}
