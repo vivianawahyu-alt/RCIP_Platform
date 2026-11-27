@@ -6,8 +6,8 @@ Dinyatakan terbuka sesuai TRD §15.4 agar tidak ada penguji atau pengguna yang m
 
 ### Korpus & ingestion
 1. **Korpus demo sintetis** (30 dokumen, nomor berawalan `S-`). Korpus resmi 30–50 dokumen publik (A-01) belum dikurasi; unggah PDF asli lewat Korpus & pasal.
-2. **Tanpa OCR**: PDF hasil pindai tidak tersegmentasi (A-04). Segmentasi hanya sampai **Pasal** (BAB → Pasal); Ayat/Huruf belum (CGR-06 mengizinkan granularitas Pasal).
-3. **Tanpa pengambilan URL terjadwal / registri sumber W1** (onboarding sumber, permitted-use) — sumber dibuat otomatis saat dokumen didaftarkan.
+2. **OCR** sudah tersedia untuk PDF hasil pindai (FR-RKM-004); hasil OCR wajib dikonfirmasi analis dan akurasinya bergantung pada kualitas pindaian. Segmentasi hanya sampai **Pasal** (BAB → Pasal); Ayat/Huruf belum (CGR-06 mengizinkan granularitas Pasal).
+3. **Registri sumber (W1)** sudah tersedia (halaman Sumber); **pengambilan dokumen lewat URL terkurasi dan terjadwal** (FR-RKM-003) belum ada — dokumen masih diunggah manual.
 4. **Koreksi segmentasi** hanya ubah teks pasal; pecah/gabung/ubah induk (TRD `PATCH /segmentation`) belum ada.
 5. Diff tidak menangani penomoran ulang massal (E5.1) atau artefak OCR (E5.2); indikasi material berbasis ambang kemiripan menghasilkan positif palsu pada perubahan redaksional (ditangani oleh reviu manusia).
 
@@ -21,8 +21,8 @@ Dinyatakan terbuka sesuai TRD §15.4 agar tidak ada penguji atau pengguna yang m
 10. **Kampanye asesmen** (PLANNED → IN_PROGRESS → EVIDENCE_PENDING …) belum ada; asesmen dicatat per kontrol.
 11. **Permintaan bukti** (FR-EVR-001, status REQUESTED) dan bukti `UNAVAILABLE` yang otomatis memunculkan temuan belum ada; bukti diunggah langsung. Masa berlaku bukti (EXPIRED otomatis) belum dijadwalkan.
 12. Status pemetaan kontrol PROPOSED/CONFIRMED dan pewarisan hasil asesmen yang ditampilkan eksplisit di laporan (E9.1) belum ada; penanda `SOURCE_CHANGED` sudah ada.
-13. Kewajiban: PENDING_LEGAL, VALIDATED/PENDING_EFFECTIVE (tanggal berlaku di masa depan), RETIRED, SUPERSEDED, sitasi pendukung lintas dokumen (E8.2) belum diimplementasikan.
-14. **Satu akun = satu peran**; BLOCKED_SOD dan penugasan ulang administratif belum ada. Manajemen pengguna & peran (FR-GOV-002) belum ada di UI.
+13. Kewajiban: eskalasi ke Peninjau Hukum (PENDING_LEGAL) sudah ada; VALIDATED/PENDING_EFFECTIVE (tanggal berlaku di masa depan), RETIRED, SUPERSEDED, sitasi pendukung lintas dokumen (E8.2) belum diimplementasikan.
+14. **Satu akun = satu peran**; BLOCKED_SOD dan penugasan ulang administratif belum ada. Manajemen pengguna (aktif/nonaktif akun) sudah ada di menu Administrasi.
 15. **Notifikasi & eskalasi** (email/in-app) belum ada; keterlambatan hanya tampil sebagai hitungan & penanda.
 16. Laporan: ruang lingkup per unit/regulator belum dapat dipilih; ekspor via cetak/PDF browser (belum ada ekspor DOCX/PDF server-side).
 17. Paginasi berbasis cursor (TRD §8.1) dan `Idempotency-Key` belum diterapkan; daftar memuat semua baris (memadai untuk volume demo).
@@ -41,8 +41,8 @@ Dinyatakan terbuka sesuai TRD §15.4 agar tidak ada penguji atau pengguna yang m
 | 1 | Integrasi LLM + evaluasi ulang (ekstraksi, klasifikasi perubahan) dengan dataset tambahan dari mentor | Menaikkan recall ekstraksi; tetap di balik gerbang grounding |
 | 1 | Kampanye asesmen & permintaan bukti (FR-CAS, FR-EVR-001) | Melengkapi W10/W11 sesuai FRD |
 | 2 | Notifikasi & eskalasi otomatis (tenggat, SLA reviu, risiko diterima lewat tinjau) | Mengurangi ketergantungan pada dasbor |
-| 2 | Multi-peran per akun + BLOCKED_SOD; manajemen pengguna di UI | Realistis untuk institusi kecil (FRD §4.3) |
-| 2 | OCR + segmentasi Ayat/Huruf; koreksi segmentasi struktural | Korpus nyata banyak PDF pindai |
+| 2 | Multi-peran per akun + BLOCKED_SOD |Realistis untuk institusi kecil (FRD §4.3) |
+| 2 | Segmentasi Ayat/Huruf; koreksi segmentasi struktural | Korpus nyata banyak PDF pindai |
 | 3 | Ekspor laporan PDF/DOCX server-side bertanda tangan; scope laporan | Kebutuhan auditor |
 | 3 | Produksi: compose prod, HTTPS, ClamAV, enkripsi at-rest, pemindaian dependensi, observabilitas terpusat | Kesiapan deployment |
 | 3 | Promosi jawaban copilot menjadi draf rekaman (W15) | Sesuai FRD, setelah copilot generatif |
