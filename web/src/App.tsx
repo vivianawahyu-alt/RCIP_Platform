@@ -126,7 +126,7 @@ export default function App() {
     {/* Footer ringkas: nama aplikasi + program, rata tengah (lihat footer.site di styles.css) */}
     <footer className="site"><div className="wrap">
             <img className="brand-logo" src={BRAND_LOGO} alt="V-TEKI IT & Business Consulting" />
-      <b>RCIP</b><p>Capstone V-TEKI × UKDW.</p>
+      <b>RCIP</b><p>Capstone V-TEKI × UKDW . Intelligence for the Real World</p>
     </div></footer>
     {cite && <div className="modal" onClick={() => setCite(null)}><div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Teks pasal">
       <div className="crumbs">{cite.document.issuer} · {cite.document.title_id}</div>
@@ -164,7 +164,7 @@ function Login({ onDone }: { onDone: (m: Me) => void }) {
     <section className="login-form">
       <form onSubmit={go} className="form">
         <h2>Masuk</h2>
-        <p className="muted small" style={{ margin: 0 }}>Pilih persona demo; setiap peran melihat aksi yang berbeda.</p>
+        <p className="muted small" style={{ margin: 0 }}>Pilih akun demo di bawah. Setiap peran memiliki menu dan aksi yang berbeda.</p>
         {err && <div className="notice error">{err}</div>}
         <label className="field">Username<input value={u} onChange={e => setU(e.target.value)} autoComplete="username" /></label>
         <label className="field">Password<input type="password" value={p} onChange={e => setP(e.target.value)} autoComplete="current-password" /></label>

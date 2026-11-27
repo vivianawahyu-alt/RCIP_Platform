@@ -353,7 +353,7 @@ table.data tr.clickable:hover td { background: #f7f9fd; }
 .login-brand { display: flex; align-items: center; gap: 16px; }
 .login-brand .brand-logo { height: 128px; }
 .login-brand strong { font-family: var(--heading); font-size: 26px; color: #fff; letter-spacing: .02em; }
-.login-brand span { display: block; font-size: 12px; color: var(--brand-cyan); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.login-brand span { display: block; font-size: 12px; color: var(--brand-cyan); font-weight: 400; letter-spacing: .14em; text-transform: uppercase; }
 .login-art .verbatim { color: #dce9fb; border-color: var(--brand-cyan); }
 .persona button:hover { border-color: var(--teal); }
 footer.site { background: var(--night); color: #9fb2cd; }
@@ -363,3 +363,22 @@ footer.site b { font-family: var(--heading); }
   .brand-logo { height: 42px; }
   .login-brand .brand-logo { height: 72px; }
 }
+
+/* ===== Halaman login: form sedikit lebih besar & mudah dibaca ===== */
+.login-form form { max-width: 400px; }
+.login-form h2 { font-size: 30px; }
+.login-form .muted.small, .login-form .hint { font-size: 15px; }
+.login-form label.field { font-size: 15px; }
+.login-form input { font-size: 16px; padding: 11px 12px; }
+.login-form .btn.primary { font-size: 16px; padding: 12px 16px; }
+.login-form .persona { gap: 8px; }
+.login-form .persona button { font-size: 14.5px; padding: 9px 12px; }
+.login-form .persona b { font-size: 14.5px; }
+
+/* HP: header tidak menempel saat scroll agar isi halaman tidak tertutup */
+@media (max-width: 640px) {
+  .mainbar { position: static; }
+}
+
+/* Kartu dengan bayangan halus ala Company Profile V-TEKI */
+.panel, .lead, .kpi { box-shadow: 0 1px 3px rgba(11, 37, 69, .06); }
