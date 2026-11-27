@@ -15,7 +15,7 @@ Aturan umum: tombol yang tidak sesuai peran Anda tidak ditampilkan, dan server t
 ## Analis Regulasi (`analyst`)
 
 1. **Korpus & pasal** — daftarkan dokumen, unggah versi (.pdf/.txt), periksa hasil segmentasi pasal, lalu **Publikasikan** (versi terbit tidak dapat diubah).
-2. **Klasifikasi & silsilah** (panel kanan Korpus) — konfirmasi atau hapus label saran aturan; usulkan relasi *mengubah/mencabut* dengan memilih pasal penetap. Bila Peninjau Hukum meminta revisi (status *Analis sedang melakukan revisi*), perbaiki jenis relasi atau pasal penetap lalu klik **Ajukan ulang**. Analis tidak dapat menyetujui relasinya sendiri.
+2. **Klasifikasi & silsilah** (panel kanan Korpus) — konfirmasi atau hapus label saran aturan; usulkan relasi *mengubah/mencabut/menggantikan* dengan memilih pasal penetap. Bila Peninjau Hukum meminta revisi (status *Analis sedang melakukan revisi*), perbaiki jenis relasi atau pasal penetap lalu klik **Ajukan ulang**. Analis tidak dapat menyetujui relasinya sendiri.
 3. **Perubahan regulasi** — klik *Bandingkan* untuk dokumen dengan dua versi terbit. Untuk tiap perubahan: pilih materialitas dan jenis, tulis alasan, **Simpan validasi**. Bila ragu secara hukum, **Eskalasi** ke Peninjau Hukum. Indikasi material dari sistem hanyalah petunjuk.
 
 ## Pejabat Kepatuhan (`officer`)
@@ -56,7 +56,7 @@ Pemberi persetujuan di enam titik kendali:
 | 5 | Penutupan temuan | Temuan → *Tutup temuan* / *Tolak penutupan* / *Terima risiko* / *Buka kembali* |
 | 6 | Penerbitan laporan | Laporan → *Terbitkan* / *Tarik laporan* |
 
-Selain enam titik kendali di atas, Manajer memutuskan **relasi dokumen** (Korpus atau Perubahan regulasi → panel Relasi dokumen): **Setujui** mengubah status dokumen target secara otomatis (mis. *Diubah*/*Dicabut*), **Tolak** wajib alasan dan tidak mengubah status. Selama status *Analis sedang melakukan revisi*, persetujuan belum dapat diberikan.
+Selain enam titik kendali di atas, Manajer memutuskan **relasi dokumen** (Korpus atau Perubahan regulasi → panel Relasi dokumen): **Setujui** mengubah status dokumen target secara otomatis (mis. *Diubah*/*Dicabut*/*Dicabut sebagian*/*Digantikan*), **Tolak** wajib alasan dan tidak mengubah status. Selama status *Analis sedang melakukan revisi*, persetujuan belum dapat diberikan.
 
 Pengembalian/penolakan selalu wajib alasan. Bila Anda pemilik tindakan atau pembuat objek, sistem menolak (gunakan `manager2`).
 

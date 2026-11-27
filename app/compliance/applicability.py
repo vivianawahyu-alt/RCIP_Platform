@@ -100,8 +100,10 @@ def suggest_applicability(db: Session, profile: OrganisationProfile, dv: Documen
             if kw in title:
                 targets |= ents
                 codes.append(f"TITLE_KEYWORD:{kw}")
-    if doc.status in ("REVOKED",):
+    if doc.status == "REVOKED":
         return ApplicabilityValue.NOT_APPLICABLE.value, "Dokumen berstatus dicabut", codes + ["DOC_REVOKED"]
+    if doc.status == "SUPERSEDED":
+        return ApplicabilityValue.NOT_APPLICABLE.value, "Dokumen berstatus digantikan", codes + ["DOC_SUPERSEDED"]
     if not targets:
         return (ApplicabilityValue.REQUIRES_FURTHER_REVIEW.value,
                 "Populasi teregulasi tidak dapat ditentukan dari label maupun judul", codes + ["NO_POPULATION_MATCH"])

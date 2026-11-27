@@ -12,8 +12,8 @@ Konvensi: semua ID UUID v4; waktu `timestamptz` (UTC); tanggal hukum `date`. Kol
 | `compliance.control` | Kontrol mitigasi beserta pemiliknya. | 36 |
 | `compliance.evidence` | Bukti kontrol / bukti penutupan tindakan; ACCEPTED imutabel (trigger). | 62 |
 | `compliance.finding` | Temuan W12 dengan severity, pemilik, target, penutupan (titik kendali #5). | 15 |
-| `compliance.legal_position` | Posisi hukum Peninjau Hukum (berversi) atas eskalasi perubahan, keberlakuan, atau kewajiban. | 2 |
-| `compliance.legal_position_citation` | Pasal yang disitasi posisi hukum, menunjuk versi pasal tertentu (provision_version). | 1 |
+| `compliance.legal_position` | Posisi hukum Peninjau Hukum (berversi) atas eskalasi perubahan, keberlakuan, atau kewajiban. | 3 |
+| `compliance.legal_position_citation` | Pasal yang disitasi posisi hukum, menunjuk versi pasal tertentu (provision_version). | 2 |
 | `compliance.obligation` | Kewajiban terstruktur; AI_DRAFT tidak pernah dihitung/dipetakan (ditegakkan DB). | 48 |
 | `compliance.obligation_control_map` | Pemetaan banyak-ke-banyak kewajiban ↔ kontrol (trigger memblokir draf AI). | 36 |
 | `compliance.organisation_profile` | Profil organisasi sintetis berversi; dasar keputusan keberlakuan. | 1 |
@@ -31,7 +31,7 @@ Konvensi: semua ID UUID v4; waktu `timestamptz` (UTC); tanggal hukum `date`. Kol
 | `platform.ai_call_log` | Setiap panggilan AI: templat+versi, model, prompt, respons mentah, validasi skema, grounding. | 55 |
 | `platform.app_user` | Akun pengguna dan perannya (8 persona + tambahan sintetis). Password PBKDF2. | 13 |
 | `platform.approval` | Keputusan maker-checker pada 6 titik kendali; append-only; snapshot status objek. | 94 |
-| `platform.audit_event` | Jejak audit append-only (trigger menolak UPDATE/DELETE). Setiap transisi status. | 146 |
+| `platform.audit_event` | Jejak audit append-only (trigger menolak UPDATE/DELETE). Setiap transisi status. | 150 |
 | `platform.config` | Parameter runtime teraudit (FR-GOV-007) dengan batas min/maks. | 10 |
 | `platform.copilot_review` | Permintaan tinjauan manusia atas jawaban copilot berkeyakinan rendah (FR-COP-005). | 0 |
 | `platform.outbox` | Event domain (transactional outbox) untuk pemrosesan asinkron oleh worker. | 0 |
@@ -504,7 +504,7 @@ Silsilah antardokumen (mengubah/mencabut/merujuk) dengan sitasi penetap.
 
 Aturan (CHECK):
 - `ck_relationship_not_self`: `CHECK ((source_document_id <> target_document_id))`
-- `relationship_relation_type_check`: `CHECK ((relation_type = ANY (ARRAY['AMENDS'::text, 'REVOKES'::text, 'PARTIALLY_REVOKES'::text, 'REFERS_TO'::text, 'IMPLEMENTS'::text])))`
+- `relationship_relation_type_check`: `CHECK ((relation_type = ANY (ARRAY['AMENDS'::text, 'REVOKES'::text, 'PARTIALLY_REVOKES'::text, 'SUPERSEDES'::text, 'REFERS_TO'::text, 'IMPLEMENTS'::text])))`
 - `relationship_state_check`: `CHECK ((state = ANY (ARRAY['PROPOSED'::text, 'REVISION_REQUESTED'::text, 'CONFIRMED'::text, 'REJECTED'::text])))`
 
 ## `corpus.taxonomy_label`

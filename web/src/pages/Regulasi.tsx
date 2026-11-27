@@ -332,7 +332,8 @@ const SEMANTIC = ["DEADLINE_CHANGED", "OBLIGATION_ADDED", "OBLIGATION_REMOVED", 
   "DEFINITION_CHANGED", "SANCTION_CHANGED", "EFFECTIVE_DATE_CHANGED", "EDITORIAL_ONLY"];
 const REVIEW_STEPS: [string, string][] = [["DETECTED", "Terdeteksi"], ["IN_REVIEW", "Direviu"], ["VALIDATED", "Dinilai material"], ["MATERIAL_CONFIRMED", "Dikonfirmasi Manajer"]];
 const RELATION_TYPES: [string, string][] = [["AMENDS", "AMENDS (mengubah)"], ["REVOKES", "REVOKES (mencabut)"],
-  ["PARTIALLY_REVOKES", "PARTIALLY_REVOKES (mencabut sebagian)"], ["REFERS_TO", "REFERS_TO (merujuk)"], ["IMPLEMENTS", "IMPLEMENTS (melaksanakan)"]];
+  ["PARTIALLY_REVOKES", "PARTIALLY_REVOKES (mencabut sebagian)"], ["SUPERSEDES", "SUPERSEDES (menggantikan)"],
+  ["REFERS_TO", "REFERS_TO (merujuk)"], ["IMPLEMENTS", "IMPLEMENTS (melaksanakan)"]];
 const published = (d?: Doc) => (d?.versions || []).filter(v => v.state === "PUBLISHED");
 
 // Halaman "Perubahan regulasi": bandingkan dua versi terbit (atas), nilai perubahan per pasal (kiri), relasi dokumen (kanan)
@@ -549,8 +550,8 @@ function DocGovernance({ doc, docs, ctx, onChange }: { doc: Doc; docs: Doc[]; ct
     </>}
     {canRel && <>
     <h3 style={{ fontSize: 16, marginTop: 14 }}>Relasi dokumen</h3>
-    {rels?.length ? <ul className="list">{rels.map(r => <RelasiItem key={r.id} r={r} provs={provs} ctx={ctx} onDone={() => { reloadR(); onChange(); }} />)}</ul> : <p className="small muted">Belum ada relasi.</p>}    {canAddRel && <div className="form" style={{ marginTop: 8 }}>
-      <div className="form-2"><label className="field">Dokumen ini…<select value={rf.relation_type} onChange={e => setRf({ ...rf, relation_type: e.target.value })}>{["AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"].map(x => <option key={x}>{x}</option>)}</select></label>
+    {rels?.length ? <ul className="list">{rels.map(r => <RelasiItem key={r.id} r={r} provs={provs} ctx={ctx} onDone={() => { reloadR(); onChange(); }} />)}</ul> : <p className="small muted">Belum ada relasi.</p>}   {canAddRel && <div className="form" style={{ marginTop: 8 }}>
+      <div className="form-2"><label className="field">Dokumen ini…<select value={rf.relation_type} onChange={e => setRf({ ...rf, relation_type: e.target.value })}>{RELATION_TYPES.map(([x, l]) => <option key={x} value={x}>{l}</option>)}</select></label>
         <label className="field">Dokumen target<select value={rf.target_document_id} onChange={e => setRf({ ...rf, target_document_id: e.target.value })}><option value="">Pilih</option>{docs.filter(d => d.id !== doc.id).map(d => <option key={d.id} value={d.id}>{d.canonical_number}</option>)}</select></label></div>
       <label className="field">Pasal penetap (wajib untuk konfirmasi)<select value={rf.citing} onChange={e => setRf({ ...rf, citing: e.target.value })}><option value="">Pilih pasal</option>{provs.map(p => <option key={p.provision_version_id} value={p.provision_version_id}>{p.number_label}</option>)}</select></label>
       <div><button className="btn" disabled={busy || !rf.target_document_id} onClick={() => run(() => api("/corpus/relationships", { body: { source_document_id: doc.id, target_document_id: rf.target_document_id, relation_type: rf.relation_type, citing_provision_version_id: rf.citing || null } }), "Relasi diusulkan.")}>Usulkan relasi</button></div>

@@ -660,3 +660,24 @@ def test_legal_queue_lists_pending_escalations(client):
     client.post(f"{P}/compliance/obligations/{ob}/legal-answer", headers=legal,
                 json={"answer": "Berlaku", "citation_provision_version_ids": [pv1]})
     assert ob not in [x["id"] for x in client.get(queue, headers=legal).json()["data"]["obligations"]]   
+
+
+def test_relationship_supersedes_sets_superseded_status(client):
+    """FRD BR-RKM-009-5: SUPERSEDES (menggantikan) yang disetujui Manajer → dokumen target SUPERSEDED;
+    setelah itu hanya REFERS_TO yang boleh diajukan ke dokumen tersebut."""
+    a, m = login(client, "analyst"), login(client, "manager")
+    d1, (v1, _) = _doc_with_two_versions(client, "Pasal 1\nBank wajib A.", "Pasal 1\nBank wajib A.")
+    d2, _ = _doc_with_two_versions(client, "Pasal 1\nBank wajib B.", "Pasal 1\nBank wajib B.")
+    pv = client.get(f"{P}/corpus/versions/{v1}/provisions", headers=a).json()["data"][0]["provision_version_id"]
+    body = {"source_document_id": d2, "target_document_id": d1, "citing_provision_version_id": pv}
+
+    rel = client.post(f"{P}/corpus/relationships", headers=a, json={**body, "relation_type": "SUPERSEDES"})
+    assert rel.status_code == 200, rel.text
+    assert client.post(f"{P}/corpus/relationships/{rel.json()['data']['id']}/confirm", headers=m).status_code == 200
+    doc = next(d for d in client.get(f"{P}/corpus/documents", headers=a).json()["data"] if d["id"] == d1)
+    assert doc["status"] == "SUPERSEDED"
+
+    again = client.post(f"{P}/corpus/relationships", headers=a, json={**body, "relation_type": "AMENDS"})
+    assert again.status_code == 409 and again.json()["error_code"] == "INVALID_STATUS_TRANSITION"
+    ref = client.post(f"{P}/corpus/relationships", headers=a, json={**body, "relation_type": "REFERS_TO"})
+    assert ref.status_code == 200    

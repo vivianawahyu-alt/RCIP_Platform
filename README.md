@@ -38,6 +38,10 @@ Dataset demo lengkap sebaiknya dibuat di database terpisah — lihat [docs/synth
   `docker exec -it rcip_postgres psql -U rcip -d rcip_db` → isi nilai `POSTGRES_PASSWORD` dari `.env`.
 - Setelah `git pull` versi ini cukup jalankan `docker compose up -d` (password lama di `.env` tetap dipakai).
 
+## Identitas visual
+Mengikuti V-TEKI Company Profile 2026: logo resmi (web/public/brand/vteki-logo.png), palet navy #0B2545,
+biru #2353C4, cyan #5AE0FF, teal #0E7C86; judul Arial Bold, isi Calibri. Warna diatur di web/src/styles.css (:root).
+
 ## Dokumentasi (deliverable proposal hal. 22)
 | Dokumen | Isi |
 |---|---|

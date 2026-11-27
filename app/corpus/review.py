@@ -293,19 +293,25 @@ def _validate_relationship_citation(
     require_citations(db, [citation_id])
     return citation_id
 
+# Jenis relasi antarperaturan (FRD tabel relasi; SUPERSEDES = menggantikan, BR-RKM-009-5)
+REL_TYPES = {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "SUPERSEDES", "REFERS_TO", "IMPLEMENTS"}
+# Dokumen yang sudah tidak berlaku: hanya boleh dirujuk (REFERS_TO), tidak boleh diubah statusnya lagi
+ENDED_STATUS = {"REVOKED": "sudah dicabut", "SUPERSEDED": "sudah digantikan"}
+
+
 def _validate_relationship_target_status(target, relation_type: str):
-    """Validasi relasi baru terhadap dokumen yang sudah REVOKED."""
-    if target.status == "REVOKED":
+    """Validasi relasi baru terhadap dokumen yang sudah REVOKED atau SUPERSEDED."""
+    if target.status in ENDED_STATUS:
         if relation_type == "REFERS_TO":
             return (
-                "Peringatan: dokumen target sudah berstatus REVOKED "
-                "(sudah dicabut), tetapi relasi REFERS_TO tetap diperbolehkan."
+                f"Peringatan: dokumen target sudah berstatus {target.status} "
+                f"({ENDED_STATUS[target.status]}), tetapi relasi REFERS_TO tetap diperbolehkan."
             )
 
         raise AppError(
             409,
             "INVALID_STATUS_TRANSITION",
-            f"Relasi {relation_type} tidak diperbolehkan karena dokumen target sudah REVOKED."
+            f"Relasi {relation_type} tidak diperbolehkan karena dokumen target sudah {target.status}."
         )
 
     return None
@@ -324,10 +330,7 @@ def propose_relationship(
     get_or_404(db, Document, body.source_document_id)
     target = get_or_404(db, Document, body.target_document_id)
 
-    if body.relation_type not in {
-        "AMENDS", "REVOKES", "PARTIALLY_REVOKES",
-        "REFERS_TO", "IMPLEMENTS"
-    }:
+    if body.relation_type not in REL_TYPES:
         raise AppError(422, "BAD_RELATION_TYPE", "relation_type tidak dikenal")
 
     if body.source_document_id == body.target_document_id:
@@ -438,7 +441,8 @@ def confirm_relationship(
     new_status = {
         "REVOKES": "REVOKED",
         "PARTIALLY_REVOKES": "PARTIALLY_REVOKED",
-        "AMENDS": "AMENDED"
+        "AMENDS": "AMENDED",
+        "SUPERSEDES": "SUPERSEDED"
     }.get(r.relation_type)
 
     # Konfirmasi relasi setelah seluruh validasi berhasil
@@ -531,7 +535,7 @@ def resubmit_relationship(rid: str, body: RelationshipUpdateIn, db: Session = De
     )
     before = {"state": r.state, "relation_type": r.relation_type, "citing": sid(r.citing_provision_version_id), "note": r.note}
     if body.relation_type is not None:
-        if body.relation_type not in {"AMENDS", "REVOKES", "PARTIALLY_REVOKES", "REFERS_TO", "IMPLEMENTS"}:
+        if body.relation_type not in REL_TYPES:
             raise AppError(422, "BAD_RELATION_TYPE", "relation_type tidak dikenal")
         r.relation_type = body.relation_type
     if body.citing_provision_version_id is not None:
