@@ -172,12 +172,11 @@ def provisions_as_of(db: Session, doc: Document, as_of: date) -> dict:
                             "path": p.hierarchical_path, "text": pv.text} for pv, p in rows]}
 
 
-# ---------------------------------------------------------------- detail peraturan + relasi
+# detail peraturan + relasi
 REL_OUT = {"AMENDS": "mengubah", "REVOKES": "mencabut", "PARTIALLY_REVOKES": "mencabut sebagian",
-           "REFERS_TO": "merujuk", "IMPLEMENTS": "melaksanakan"}
+           "SUPERSEDES": "menggantikan", "REFERS_TO": "merujuk", "IMPLEMENTS": "melaksanakan"}
 REL_IN = {"AMENDS": "diubah oleh", "REVOKES": "dicabut oleh", "PARTIALLY_REVOKES": "dicabut sebagian oleh",
-          "REFERS_TO": "dikutip oleh", "IMPLEMENTS": "dilaksanakan oleh"}
-
+          "SUPERSEDES": "digantikan oleh", "REFERS_TO": "dikutip oleh", "IMPLEMENTS": "dilaksanakan oleh"}
 
 def document_detail(db: Session, doc: Document) -> dict:
     vs = db.scalars(select(DocumentVersion).where(DocumentVersion.document_id == doc.id)

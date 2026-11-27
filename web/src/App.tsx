@@ -83,7 +83,7 @@ export default function App() {
       <button onClick={logout}>Keluar</button>
     </div></div>
     <div className="mainbar"><div className="wrap">
-      <button className="wordmark" onClick={() => go(homeRoute(me.role))} aria-label="Beranda RCIP"><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
+      <button className="wordmark" onClick={() => go(homeRoute(me.role))}aria-label="Beranda RCIP"><img className="brand-logo" src={BRAND_LOGO} alt="V-TEKI IT & Business Consulting" /><i className="divider" aria-hidden="true" /><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
       <nav className="menu" aria-label="Menu utama">
         {MENU.map(g => ({ ...g, items: g.items.filter(i => canSeePage(me.role, i.route) && (!i.only || i.only.includes(me.role))) })).filter(g => g.items.length > 0).map(g => {
                     const active = g.items.some(i => i.route === (page === "peraturan" ? "katalog" : page));  // halaman detail ikut menandai Katalog
@@ -125,7 +125,8 @@ export default function App() {
     </main>
     {/* Footer ringkas: nama aplikasi + program, rata tengah (lihat footer.site di styles.css) */}
     <footer className="site"><div className="wrap">
-      <b>RCIP</b><p>Capstone V-TEKI × UKDW.</p>
+            <img className="brand-logo" src={BRAND_LOGO} alt="V-TEKI IT & Business Consulting" />
+      <b>RCIP</b><p>Capstone V-TEKI × UKDW . Intelligence for the Real World</p>
     </div></footer>
     {cite && <div className="modal" onClick={() => setCite(null)}><div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Teks pasal">
       <div className="crumbs">{cite.document.issuer} · {cite.document.title_id}</div>
@@ -136,6 +137,9 @@ export default function App() {
     </div></div>}
   </>;
 }
+
+// Logo resmi V-TEKI (Logo V-TEKI HD Trans, latar transparan) — web/public/brand/vteki-logo.png
+const BRAND_LOGO = `${import.meta.env.BASE_URL}brand/vteki-logo.png`;
 
 const PERSONAS: [string, string][] = [["officer", "Pejabat Kepatuhan"], ["manager", "Manajer Kepatuhan"], ["owner", "Pemilik Kontrol"],
   ["analyst", "Analis Regulasi"], ["auditor", "Auditor Internal"], ["legal", "Peninjau Hukum"], ["executive", "Eksekutif"], ["admin", "Administrator"]];
@@ -149,7 +153,7 @@ function Login({ onDone }: { onDone: (m: Me) => void }) {
   };
   return <div className="login-shell">
     <section className="login-art">
-      <div><strong style={{ fontFamily: "var(--serif)", fontSize: 28, color: "#fff" }}>RCIP</strong></div>
+      <div className="login-brand"><img className="brand-logo" src={BRAND_LOGO} alt="V-TEKI IT & Business Consulting" /><div><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></div></div>
       <div>
         <h1>Dari pasal regulasi sampai bukti pelaksanaannya.</h1>
         <div className="verbatim">“Bank wajib menyampaikan laporan insiden TI kepada Otoritas Jasa Keuangan paling lambat 12 (dua belas) jam setelah insiden TI diketahui.”</div>
@@ -160,7 +164,7 @@ function Login({ onDone }: { onDone: (m: Me) => void }) {
     <section className="login-form">
       <form onSubmit={go} className="form">
         <h2>Masuk</h2>
-        <p className="muted small" style={{ margin: 0 }}>Pilih persona demo; setiap peran melihat aksi yang berbeda.</p>
+        <p className="muted small" style={{ margin: 0 }}>Pilih akun demo di bawah. Setiap peran memiliki menu dan aksi yang berbeda.</p>
         {err && <div className="notice error">{err}</div>}
         <label className="field">Username<input value={u} onChange={e => setU(e.target.value)} autoComplete="username" /></label>
         <label className="field">Password<input type="password" value={p} onChange={e => setP(e.target.value)} autoComplete="current-password" /></label>

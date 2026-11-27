@@ -1,26 +1,35 @@
-/* RCIP — tampilan portal regulasi. Struktur terinspirasi portal informasi hukum; identitas visual sendiri. */
+/* RCIP — tampilan portal regulasi dengan identitas visual V-TEKI (IT & Business Consulting).
+   Palet & tipografi dari V-TEKI Company Profile 2026: navy #0B2545, latar gelap #0D1A2E, teks #4A5C74,
+   garis #DBE2EE, aksen teal #0E7C86, biru #2353C4, cyan #5AE0FF; judul Arial Bold, isi Calibri.
+   Nama variabel lama (--teal = warna aksi utama, dst.) dipertahankan agar seluruh halaman ikut berubah. */
 :root {
-  --ink: #14213d;
-  --ink-2: #3d4a63;
-  --muted: #667085;
-  --line: #dde2ea;
-  --surface: #f4f6f8;
+  --ink: #0b2545;          /* navy V-TEKI: judul & teks utama */
+  --ink-2: #3e4f67;        /* teks isi */
+  --muted: #5b6b82;        /* teks sekunder (kontras AA) */
+  --line: #dbe2ee;
+  --surface: #f4f7fb;      /* latar terang company profile */
   --paper: #ffffff;
-  --teal: #0e5a54;
-  --teal-2: #0b4843;
-  --teal-soft: #e5f1ef;
-  --seal: #b8932f;
-  --seal-soft: #f8f1dc;
+  --night: #0d1a2e;        /* latar gelap V-TEKI (header, login, footer) */
+  --night-2: #132856;
+  --teal: #2353c4;         /* warna aksi utama = biru V-TEKI (nama variabel lama dipertahankan) */
+  --teal-2: #1a3f99;
+  --teal-soft: #e8eefb;
+  --brand-teal: #0e7c86;   /* aksen label/eyebrow V-TEKI */
+  --brand-teal-soft: #e2f3f4;
+  --brand-cyan: #5ae0ff;   /* aksen di atas latar gelap */
+  --seal: #a8610a;         /* sitasi pasal (amber V-TEKI) */
+  --seal-soft: #fbf1e4;
   --red: #b42318; --red-soft: #fdecea;
   --amber: #b54708; --amber-soft: #fef3e2;
   --green: #067647; --green-soft: #e7f6ee;
   --blue: #1d4ed8; --blue-soft: #e8efff;
-  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
-  --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --heading: Arial, Arimo, "Helvetica Neue", Helvetica, sans-serif;           /* judul: Arial Bold */
+  --sans: Calibri, Carlito, "Segoe UI", system-ui, -apple-system, sans-serif;  /* isi: Calibri */
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;               /* hanya kutipan teks pasal */
   font-family: var(--sans);
   color: var(--ink);
   background: var(--surface);
-  font-size: 15px;
+  font-size: 15.5px;
   line-height: 1.5;
 }
 * { box-sizing: border-box; }
@@ -311,3 +320,65 @@ button.kpi:focus-visible { outline: 2px solid var(--seal); }
 .change-card .verbatim { margin-top: 12px; }
 .change-title { font-family: var(--serif); font-size: 18px; }
 @media (max-width: 760px) { .compare-bar { grid-template-columns: 1fr 1fr; } .compare-bar .field:first-child { grid-column: 1 / -1; } }
+
+/* ===================== Branding V-TEKI (menimpa gaya di atas) ===================== */
+:focus-visible { outline-color: var(--teal); }
+h1, h2, h3, h4 { font-family: var(--heading); font-weight: 700; color: var(--ink); }
+.utility { background: #08142a; color: #b9c6da; }
+.utility :focus-visible, .mainbar :focus-visible, .login-art :focus-visible, footer.site :focus-visible { outline-color: var(--brand-cyan); }
+/* header gelap seperti sampul company profile, agar logo resmi (putih + cyan) terlihat */
+.mainbar { background: var(--night); background-image: radial-gradient(ellipse at 70% 0%, var(--night-2) 0%, transparent 60%); border-bottom: 1px solid #1d2d4a; }
+.wordmark { align-items: center; gap: 12px; padding: 4px 0; }
+.brand-logo { display: block; height: 60px; width: auto; }
+.wordmark .divider { width: 1px; align-self: stretch; margin: 6px 0; background: #2c3e5e; }
+.wordmark strong { font-family: var(--heading); font-size: 22px; color: #fff; letter-spacing: .02em; }
+.wordmark span { color: #9fb2cd; }
+.menu-group > button { color: #dbe4f3; }
+.menu-group > button:hover, .menu-group.open > button { color: #fff; background: rgba(255, 255, 255, .08); }
+.menu-group > button.active { color: #fff; box-shadow: inset 0 -3px 0 var(--brand-cyan); }
+.dropdown { box-shadow: 0 12px 32px rgba(11, 37, 69, .18); }
+.dropdown b { color: var(--ink); }
+.dropdown button:hover b { color: var(--teal); }
+.searchrow button:hover { background: var(--teal); }
+/* label kecil di atas judul: gaya "eyebrow" V-TEKI */
+.crumbs { font-size: 12px; color: var(--brand-teal); margin-bottom: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.facts b, .sevbar b, .kpi-value, .bab-title, .change-title { font-family: var(--heading); font-weight: 700; }
+.badge.teal { background: var(--brand-teal-soft); color: #0b6670; border-color: #b6dde0; }
+.cite { border-color: #ebd3b0; color: #7a4706; }
+.list button.rowlink:focus-visible, button.kpi:focus-visible { outline-color: var(--teal); }
+.flow span.done { background: #dce6f8; color: var(--teal-2); }
+.modal { background: rgba(11, 37, 69, .5); }
+table.data tr.clickable:hover td { background: #f7f9fd; }
+.login-art { background: var(--night); background-image: radial-gradient(ellipse at 75% 35%, var(--night-2) 0%, transparent 65%); color: #b9c6da; gap: 32px; }
+.login-brand { display: flex; align-items: center; gap: 16px; }
+.login-brand .brand-logo { height: 128px; }
+.login-brand strong { font-family: var(--heading); font-size: 26px; color: #fff; letter-spacing: .02em; }
+.login-brand span { display: block; font-size: 12px; color: var(--brand-cyan); font-weight: 400; letter-spacing: .14em; text-transform: uppercase; }
+.login-art .verbatim { color: #dce9fb; border-color: var(--brand-cyan); }
+.persona button:hover { border-color: var(--teal); }
+footer.site { background: var(--night); color: #9fb2cd; }
+footer.site .brand-logo { height: 44px; margin: 0 auto 8px; }
+footer.site b { font-family: var(--heading); }
+@media (max-width: 640px) {
+  .brand-logo { height: 42px; }
+  .login-brand .brand-logo { height: 72px; }
+}
+
+/* ===== Halaman login: form sedikit lebih besar & mudah dibaca ===== */
+.login-form form { max-width: 400px; }
+.login-form h2 { font-size: 30px; }
+.login-form .muted.small, .login-form .hint { font-size: 15px; }
+.login-form label.field { font-size: 15px; }
+.login-form input { font-size: 16px; padding: 11px 12px; }
+.login-form .btn.primary { font-size: 16px; padding: 12px 16px; }
+.login-form .persona { gap: 8px; }
+.login-form .persona button { font-size: 14.5px; padding: 9px 12px; }
+.login-form .persona b { font-size: 14.5px; }
+
+/* HP: header tidak menempel saat scroll agar isi halaman tidak tertutup */
+@media (max-width: 640px) {
+  .mainbar { position: static; }
+}
+
+/* Kartu dengan bayangan halus ala Company Profile V-TEKI */
+.panel, .lead, .kpi { box-shadow: 0 1px 3px rgba(11, 37, 69, .06); }

@@ -51,9 +51,9 @@ export function Status({ s }: { s?: string | null }) {
   const [label, tone] = STATE_LABEL[s] || [s, ""];
   return <span className={`badge ${tone}`} title={s}>{label}</span>;
 }
-const SEV: Record<string, [string, string]> = { CRITICAL: ["Kritis", "#7a0916"], HIGH: ["Tinggi", "#b42318"], MEDIUM: ["Sedang", "#b54708"], LOW: ["Rendah", "#667085"] };
+const SEV: Record<string, [string, string]> = { CRITICAL: ["Kritis", "#7a0916"], HIGH: ["Tinggi", "#b42318"], MEDIUM: ["Sedang", "#b54708"], LOW: ["Rendah", "#5b6b82"] };
 export function Sev({ s }: { s: string }) {
-  const [l, c] = SEV[s] || [s, "#667085"];
+  const [l, c] = SEV[s] || [s, "#5b6b82"];
   return <span className="sev" style={{ ["--c" as any]: c, color: c }}>{l}</span>;
 }
 export const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
@@ -130,10 +130,10 @@ export const canSeePage = (role: Role, page: string): boolean => {
 };
 
 export function ImpactIcon({ level }: { level: "high" | "medium" | "low" }) {
-  const c = level === "high" ? "#b42318" : level === "medium" ? "#b54708" : "#667085";
+  const c = level === "high" ? "#b42318" : level === "medium" ? "#b54708" : "#5b6b82";
   const bars = level === "high" ? 3 : level === "medium" ? 2 : 1;
   return <svg className="impact-ico" viewBox="0 0 18 18" aria-label={`dampak ${level}`} role="img">
-    {[0, 1, 2].map(i => <rect key={i} x={2 + i * 5.5} y={12 - i * 4} width="4" height={4 + i * 4} rx="1" fill={i < bars ? c : "#dde2ea"} />)}
+    {[0, 1, 2].map(i => <rect key={i} x={2 + i * 5.5} y={12 - i * 4} width="4" height={4 + i * 4} rx="1" fill={i < bars ? c : "#dbe2ee"} />)}
   </svg>;
 }
 
