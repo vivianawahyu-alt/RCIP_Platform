@@ -16,11 +16,11 @@ RCIP adalah aplikasi web yang menjaga rantai bukti kepatuhan sebagai relasi basi
 | Produk | Demonstration scenario | `docs/demo_scenario.md` ✅ |
 | Teknis | Source code | repositori ini ✅ |
 | Teknis | Architecture diagram | `docs/architecture.md` (C4 L1–L3 + sekuens) ✅ |
-| Teknis | Database schema | `alembic/versions/001–003`, `docs/erd.md`, `docs/data_dictionary.md` (dibangkitkan) ✅ |
+| Teknis | Database schema | `alembic/versions/001–012`, `docs/erd.md`, `docs/data_dictionary.md` (dibangkitkan) ✅ |
 | Teknis | API documentation | `docs/api.md` + `docs/openapi.json` (dibangkitkan), Swagger `/docs` ✅ |
 | Teknis | AI/model documentation | `docs/ai_model.md` ✅ |
 | Teknis | Synthetic data & data dictionary | `seed/generate.py`, `docs/synthetic_data.md`, `docs/data_dictionary.md` ✅ |
-| Teknis | Automated tests | `tests/` — 39 test, CI `.github/workflows/ci.yml` ✅ |
+| Teknis | Automated tests | `tests/` — 137 test, CI `.github/workflows/ci.yml` ✅ |
 | Teknis | Deployment guide | `docs/deployment_guide.md` ✅ |
 | Bisnis | Functional Requirement Specification | RCIP-FRD-001 (dokumen tim) ✅ |
 | Bisnis | Technical Requirement Specification | RCIP-TRD-001 (dokumen tim) ✅ |
@@ -51,7 +51,7 @@ RCIP adalah aplikasi web yang menjaga rantai bukti kepatuhan sebagai relasi basi
 | Error handling | amplop RFC 7807 + `offending`, tanpa kebocoran stack trace |
 | Security controls | lihat checklist |
 | Privacy protection | data sintetis, aturan data AI |
-| Automated testing | 39 test + CI |
+| Automated testing | 137 test + CI |
 | Deployment documentation | `deployment_guide.md` |
 | User manual | `user_manual.md` |
 | Technical documentation | `architecture.md`, `ai_model.md`, `api.md`, `data_dictionary.md` |
@@ -78,7 +78,7 @@ RCIP adalah aplikasi web yang menjaga rantai bukti kepatuhan sebagai relasi basi
 
 ## 5. Hasil pengujian
 
-`pytest -q` → **39 passed**, dijalankan pada tiga basis data: (1) DB baru hasil migrasi + seed, (2) backup DB tim yang di-upgrade 001→003, (3) DB berisi data lama tahap 1 yang di-upgrade. Alur UI diuji otomatis di browser (Playwright): ekstraksi → validasi → kontrol → bukti → asesmen → sign-off → remediasi → penutupan → laporan, serta reviu perubahan, keberlakuan, penjelasan AI, pembukaan kembali kewajiban, dan konfigurasi admin. `python -m seed.validate` → 15/15 invarian terpenuhi.
+`pytest -q` → **137 passed**, dijalankan pada tiga basis data: (1) DB baru hasil migrasi + seed, (2) backup DB tim yang di-upgrade 001→012, (3) DB berisi data lama tahap 1 yang di-upgrade. Alur UI diuji otomatis di browser (Playwright): ekstraksi → validasi → kontrol → bukti → asesmen → sign-off → remediasi → penutupan → laporan, serta reviu perubahan, keberlakuan, penjelasan AI, pembukaan kembali kewajiban, dan konfigurasi admin. `python -m seed.validate` → 15/15 invarian terpenuhi.
 
 | Berkas test | Cakupan |
 |---|---|
@@ -95,7 +95,7 @@ RCIP adalah aplikasi web yang menjaga rantai bukti kepatuhan sebagai relasi basi
 
 ```
 app/            API: platform (auth, audit, config), corpus (Group A), compliance (Group B), ai, copilot, shared
-alembic/        migrasi 001 (skema dasar) · 002 (temuan/asesmen/laporan) · 003 (titik 1–2, relasi, taksonomi, config)
+alembic/        migrasi 001 (skema dasar) · 002 (temuan/asesmen/laporan) · 003 (titik 1–2, relasi, taksonomi, config) · 004 (OCR) · 005–008 (metadata dokumen, status akun, pelengkap analis) · 009–010 (posisi hukum) · 011 (URL asal) · 012 (relasi SUPERSEDES)
 seed/           seed minimal, generator data sintetis, validator, data dictionary, ground truth
 tests/          test otomatis + tests/ai (dataset evaluasi)
 web/            frontend React (src/pages per halaman, ui.tsx komponen bersama)

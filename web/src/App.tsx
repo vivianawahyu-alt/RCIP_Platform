@@ -83,7 +83,7 @@ export default function App() {
       <button onClick={logout}>Keluar</button>
     </div></div>
     <div className="mainbar"><div className="wrap">
-      <button className="wordmark" onClick={() => go(homeRoute(me.role))}aria-label="Beranda RCIP"><img className="brand-logo" src={BRAND_LOGO} alt="V-TEKI IT & Business Consulting" /><i className="divider" aria-hidden="true" /><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
+      <button className="wordmark" onClick={() => go(homeRoute(me.role))} aria-label="Beranda RCIP"><img className="brand-logo" src={BRAND_LOGO} alt="V-TEKI IT & Business Consulting" /><i className="divider" aria-hidden="true" /><strong>RCIP</strong><span>Regulatory & Compliance Intelligence</span></button>
       <nav className="menu" aria-label="Menu utama">
         {MENU.map(g => ({ ...g, items: g.items.filter(i => canSeePage(me.role, i.route) && (!i.only || i.only.includes(me.role))) })).filter(g => g.items.length > 0).map(g => {
                     const active = g.items.some(i => i.route === (page === "peraturan" ? "katalog" : page));  // halaman detail ikut menandai Katalog
@@ -126,7 +126,7 @@ export default function App() {
     {/* Footer ringkas: nama aplikasi + program, rata tengah (lihat footer.site di styles.css) */}
     <footer className="site"><div className="wrap">
             <img className="brand-logo" src={BRAND_LOGO} alt="V-TEKI IT & Business Consulting" />
-      <b>RCIP</b><p>Capstone V-TEKI × UKDW . Intelligence for the Real World</p>
+      <b>RCIP</b><p>Capstone V-TEKI × UKDW · Intelligence for the Real World</p>
     </div></footer>
     {cite && <div className="modal" onClick={() => setCite(null)}><div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Teks pasal">
       <div className="crumbs">{cite.document.issuer} · {cite.document.title_id}</div>
@@ -138,7 +138,7 @@ export default function App() {
   </>;
 }
 
-// Logo resmi V-TEKI (Logo V-TEKI HD Trans, latar transparan) — web/public/brand/vteki-logo.png
+// Logo resmi V-TEKI (dari sampul V-TEKI Company Profile 2026, latar transparan) — web/public/brand/vteki-logo.png
 const BRAND_LOGO = `${import.meta.env.BASE_URL}brand/vteki-logo.png`;
 
 const PERSONAS: [string, string][] = [["officer", "Pejabat Kepatuhan"], ["manager", "Manajer Kepatuhan"], ["owner", "Pemilik Kontrol"],
